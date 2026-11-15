@@ -14,6 +14,9 @@ struct SettingsView: View {
             AppearanceSettings()
                 .tabItem { Label("Appearance", systemImage: "paintpalette") }
                 .tag("appearance")
+            TaskbarSettingsView()
+                .tabItem { Label("Taskbar", systemImage: "dock.rectangle") }
+                .tag("taskbar")
             PlacesSettings()
                 .tabItem { Label("Places", systemImage: "folder") }
                 .tag("places")

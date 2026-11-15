@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let fileSearch = FileSearch()
     let prefs = Preferences()
     let updater = UpdaterModel()
+    private(set) lazy var taskbar = TaskbarController(prefs: prefs)
 
     private var statusItem: NSStatusItem!
     private var panel: StartPanel!
@@ -59,6 +60,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         installKeyMonitor()
+        setUpTaskbar()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.showRecoveryNoticeIfNeeded() }
 
         #if DEBUG
@@ -228,6 +230,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .environmentObject(library)
                 .environmentObject(catalog)
                 .environmentObject(updater)
+                .environmentObject(taskbar.tracker)
+                .environmentObject(taskbar.thumbnails)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Mac2Seven Settings"
             window.styleMask = [.titled, .closable, .miniaturizable]
@@ -239,6 +243,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         settingsWindow?.makeKeyAndOrderFront(nil)
         // Nothing needs keyboard focus on open; otherwise the tab bar shows a stray focus ring.
         DispatchQueue.main.async { [weak self] in self?.settingsWindow?.makeFirstResponder(nil) }
+    }
+
+    // MARK: Taskbar
+
+    private func setUpTaskbar() {
+        taskbar.onStart = { [weak self] rect in self?.toggleFromTaskbar(rect) }
+        taskbar.onOpenSettings = { [weak self] in self?.openSettings(tab: "taskbar") }
+        taskbar.start()
+    }
+
+    /// The Start button: opens the menu just above the taskbar, lined up with the button.
+    private func toggleFromTaskbar(_ button: NSRect) {
+        if panel.isVisible {
+            closePanel()
+            return
+        }
+        let size = Self.panelSize
+        let screen = NSScreen.screens.first { $0.frame.intersects(button) } ?? NSScreen.main ?? NSScreen.screens[0]
+        let f = screen.frame
+        let x = prefs.data.taskbar.alignment == .left ? button.minX : button.minX - 8
+        let origin = NSPoint(x: min(max(x, f.minX + 8), f.maxX - size.width - 8),
+                             y: f.minY + taskbar.barHeight + 8)
+        openPanel(at: origin)
     }
 
     // MARK: Hotkey
@@ -263,10 +290,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openPanel()
     }
 
-    func openPanel() {
+    func openPanel(at origin: NSPoint? = nil) {
         catalog.refresh()
         menuState.reset()
-        panel.setFrameOrigin(panelOrigin())
+        taskbar.hidePreviewNow()
+        panel.setFrameOrigin(origin ?? panelOrigin())
         panel.makeKeyAndOrderFront(nil)
         panel.invalidateShadow()
     }
