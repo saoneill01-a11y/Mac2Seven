@@ -1,0 +1,46 @@
+name: Mac2Seven
+options:
+  bundleIdPrefix: com.csioly
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Mac2Seven:
+    type: application
+    platform: macOS
+    sources:
+      - path: Mac2Seven
+    info:
+      path: Mac2Seven/Info.plist
+      properties:
+        CFBundleDisplayName: Mac2Seven
+        CFBundleName: Mac2Seven
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSUIElement: true
+        LSApplicationCategoryType: public.app-category.utilities
+        NSAppleEventsUsageDescription: Mac2Seven uses System Events to shut down, restart, or log out when you choose those options.
+        NSHumanReadableCopyright: ""
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.csioly.Mac2Seven.app-reference
+            UTTypeDescription: Mac2Seven app reference
+            UTTypeConformsTo: [public.data]
+          - UTTypeIdentifier: com.csioly.Mac2Seven.folder-reference
+            UTTypeDescription: Mac2Seven folder reference
+            UTTypeConformsTo: [public.data]
+    entitlements:
+      path: Mac2Seven/Mac2Seven.entitlements
+      properties:
+        com.apple.security.automation.apple-events: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.csioly.Mac2Seven
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        COMBINE_HIDPI_IMAGES: YES
