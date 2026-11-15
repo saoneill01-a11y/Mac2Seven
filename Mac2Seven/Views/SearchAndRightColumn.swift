@@ -7,6 +7,7 @@ struct SearchResultsView: View {
     let hits: [SearchHit]
     let open: (SearchHit) -> Void
     @EnvironmentObject var state: MenuState
+    @Environment(\.palette) private var p
 
     var body: some View {
         let selected = min(state.selection, max(hits.count - 1, 0))
@@ -44,7 +45,7 @@ struct SearchResultsView: View {
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.system(size: 12, weight: .semibold))
-            .foregroundStyle(Color(red: 0.12, green: 0.25, blue: 0.5))
+            .foregroundStyle(p.sectionHeader)
             .padding(.horizontal, 6)
             .padding(.top, 6)
             .padding(.bottom, 2)
@@ -65,6 +66,7 @@ struct FileRow: View {
     let url: URL
     let selected: Bool
     let action: () -> Void
+    @Environment(\.palette) private var p
     @State private var hover = false
 
     var body: some View {
@@ -75,7 +77,7 @@ struct FileRow: View {
             VStack(alignment: .leading, spacing: 0) {
                 Text(url.lastPathComponent)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.black.opacity(0.85))
+                    .foregroundStyle(p.text)
                     .lineLimit(1)
                 Text(url.deletingLastPathComponent().path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                     .font(.system(size: 10))
@@ -101,8 +103,8 @@ struct FileRow: View {
 // MARK: Right column
 
 struct RightColumn: View {
-    @EnvironmentObject var state: MenuState
-    private let fm = FileManager.default
+    @EnvironmentObject var prefs: Preferences
+    @Environment(\.palette) private var p
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
@@ -114,114 +116,110 @@ struct RightColumn: View {
             .padding(.top, 6)
             .padding(.bottom, 10)
 
-            PlaceRow(title: NSFullUserName().isEmpty ? NSUserName() : NSFullUserName(),
-                     url: fm.homeDirectoryForCurrentUser, bold: true)
-            PlaceRow(title: "Documents", url: dir(.documentDirectory))
-            PlaceRow(title: "Pictures", url: dir(.picturesDirectory))
-            PlaceRow(title: "Music", url: dir(.musicDirectory))
-            PlaceRow(title: "Downloads", url: dir(.downloadsDirectory))
-            separator
-            PlaceRow(title: "Computer", url: URL(fileURLWithPath: "/"))
-            PlaceRow(title: "Applications", url: URL(fileURLWithPath: "/Applications"))
-            separator
-            PlaceRow(title: "System Settings", url: URL(fileURLWithPath: "/System/Applications/System Settings.app"))
-            PlaceRow(title: "Activity Monitor", url: URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app"))
-
-            Spacer()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 1) {
+                    ForEach(prefs.data.places) { place in
+                        if place.isSeparator {
+                            Rectangle()
+                                .fill(LinearGradient(colors: [.clear, p.rightSeparator, .clear],
+                                                     startPoint: .leading, endPoint: .trailing))
+                                .frame(height: 1)
+                                .padding(.vertical, 6)
+                        } else {
+                            PlaceRow(place: place)
+                        }
+                    }
+                }
+            }
 
             HStack {
                 Spacer()
                 PowerButton()
             }
+            .padding(.top, 6)
             .padding(.bottom, 4)
         }
         .padding(.leading, 10)
         .padding(.trailing, 4)
     }
-
-    private var separator: some View {
-        Rectangle()
-            .fill(LinearGradient(colors: [.clear, .white.opacity(0.3), .clear], startPoint: .leading, endPoint: .trailing))
-            .frame(height: 1)
-            .padding(.vertical, 6)
-    }
-
-    private func dir(_ d: FileManager.SearchPathDirectory) -> URL {
-        fm.urls(for: d, in: .userDomainMask).first ?? fm.homeDirectoryForCurrentUser
-    }
 }
 
 struct UserPicture: View {
     @EnvironmentObject var state: MenuState
+    @Environment(\.palette) private var p
     private static let userImage: NSImage? = CBIdentity(name: NSUserName(), authority: .default())?.image
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(LinearGradient(colors: [.white.opacity(0.55), .white.opacity(0.15)], startPoint: .top, endPoint: .bottom))
+            RoundedRectangle(cornerRadius: p.cardCorner + 2, style: .continuous)
+                .fill(LinearGradient(colors: p.pictureFrame, startPoint: .top, endPoint: .bottom))
                 .frame(width: 64, height: 64)
-                .shadow(color: .black.opacity(0.35), radius: 3, y: 1)
+                .shadow(color: .black.opacity(p.useBlur ? 0.35 : 0), radius: 3, y: 1)
             Group {
                 if let path = state.hoverIconPath {
                     Image(nsImage: IconCache.icon(path)).resizable().padding(4)
                 } else if let image = Self.userImage {
                     Image(nsImage: image).resizable()
                 } else {
-                    Image(systemName: "person.crop.square.fill").resizable().foregroundStyle(.white.opacity(0.85))
+                    Image(systemName: "person.crop.square.fill").resizable().foregroundStyle(p.rightText.opacity(0.85))
                 }
             }
             .frame(width: 54, height: 54)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: max(p.cardCorner - 2, 1), style: .continuous))
         }
         .animation(.easeOut(duration: 0.12), value: state.hoverIconPath)
     }
 }
 
 struct PlaceRow: View {
-    let title: String
-    let url: URL
-    var bold = false
+    let place: Place
     @EnvironmentObject var state: MenuState
+    @Environment(\.palette) private var p
     @State private var hover = false
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 13, weight: bold ? .semibold : .regular))
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.5), radius: 1, y: 1)
+        Text(place.title)
+            .font(.system(size: 13, weight: place.bold ? .semibold : .regular))
+            .foregroundStyle(p.rightText)
+            .shadow(color: p.rightTextShadow, radius: 1, y: 1)
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
             .background(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(hover ? Color.white.opacity(0.16) : .clear)
+                RoundedRectangle(cornerRadius: p.rowCorner, style: .continuous)
+                    .fill(hover ? p.rightHoverFill : .clear)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .strokeBorder(hover ? Color.white.opacity(0.35) : .clear)
+                        RoundedRectangle(cornerRadius: p.rowCorner, style: .continuous)
+                            .strokeBorder(hover ? p.rightHoverStroke : .clear)
                     )
             )
             .contentShape(Rectangle())
             .onHover { inside in
                 hover = inside
-                state.hoverIconPath = inside ? url.path : nil
+                state.hoverIconPath = inside ? place.path : nil
             }
             .onTapGesture {
-                NSWorkspace.shared.open(url)
+                NSWorkspace.shared.open(place.url)
                 state.close()
             }
+            .help(place.path)
     }
 }
 
 struct PowerButton: View {
     @EnvironmentObject var state: MenuState
+    @EnvironmentObject var prefs: Preferences
+    @Environment(\.palette) private var p
 
     var body: some View {
+        let main = prefs.data.powerAction
+
         HStack(spacing: 0) {
             Button {
-                perform(.shutDown)
+                perform(main)
             } label: {
-                Text("Shut down")
+                Text(main.title)
                     .font(.system(size: 12, weight: .medium))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 5)
@@ -229,14 +227,12 @@ struct PowerButton: View {
             }
             .buttonStyle(.plain)
 
-            Rectangle().fill(.white.opacity(0.3)).frame(width: 1, height: 18)
+            Rectangle().fill(p.rightSeparator).frame(width: 1, height: 18)
 
             Menu {
-                Button("Log Out") { perform(.logOut) }
-                Button("Lock") { perform(.lock) }
-                Divider()
-                Button("Restart") { perform(.restart) }
-                Button("Sleep") { perform(.sleep) }
+                ForEach(PowerAction.allCases.filter { $0 != main }) { action in
+                    Button(action.title) { perform(action) }
+                }
             } label: {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 10, weight: .bold))
@@ -246,14 +242,14 @@ struct PowerButton: View {
             .fixedSize()
             .padding(.horizontal, 8)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(p.rightText)
         .background(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.06)], startPoint: .top, endPoint: .bottom))
+            RoundedRectangle(cornerRadius: p.rowCorner, style: .continuous)
+                .fill(LinearGradient(colors: p.buttonFill, startPoint: .top, endPoint: .bottom))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.35))
+            RoundedRectangle(cornerRadius: p.rowCorner, style: .continuous)
+                .strokeBorder(p.buttonStroke)
         )
     }
 

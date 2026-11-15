@@ -339,13 +339,15 @@ private struct FolderHeaderDelegate: DropDelegate {
 }
 
 private struct InsertionLine: View {
+    @Environment(\.palette) private var p
+
     var body: some View {
         HStack(spacing: 0) {
             Circle()
-                .strokeBorder(Theme.insertionLine, lineWidth: 2)
+                .strokeBorder(p.insertionLine, lineWidth: 2)
                 .frame(width: 8, height: 8)
             Rectangle()
-                .fill(Theme.insertionLine)
+                .fill(p.insertionLine)
                 .frame(height: 2.5)
         }
         .frame(height: 8)

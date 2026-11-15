@@ -67,6 +67,7 @@ struct FolderTree: View {
     @EnvironmentObject var library: Library
     @EnvironmentObject var catalog: AppCatalog
     @EnvironmentObject var state: MenuState
+    @Environment(\.palette) private var p
     @State private var dropTarget = false
     /// An app is being dragged over this folder's title row.
     @State private var headerTarget = false
@@ -107,7 +108,7 @@ struct FolderTree: View {
         .padding(.bottom, isOpen ? 3 : 0)
         .background(
             RoundedRectangle(cornerRadius: 5, style: .continuous)
-                .strokeBorder(anyTarget ? Theme.insertionLine.opacity(0.6) : .clear, lineWidth: 1.5)
+                .strokeBorder(anyTarget ? p.folderOutline : .clear, lineWidth: 1.5)
         )
         .contentShape(Rectangle())
         // The whole folder (its title and, when open, everything inside) accepts apps,
@@ -154,7 +155,7 @@ struct FolderTree: View {
             } else {
                 Text(folder.name)
                     .font(.system(size: 12))
-                    .foregroundStyle(Color.black.opacity(0.85))
+                    .foregroundStyle(p.text)
             }
             Spacer(minLength: 0)
         }

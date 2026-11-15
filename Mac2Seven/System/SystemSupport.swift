@@ -63,8 +63,19 @@ final class StartPanel: NSPanel {
     override var canBecomeMain: Bool { false }
 }
 
-enum PowerAction {
-    case shutDown, restart, logOut, sleep, lock
+enum PowerAction: String, Codable, CaseIterable, Identifiable {
+    case shutDown, restart, sleep, lock, logOut
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .shutDown: return "Shut down"
+        case .restart: return "Restart"
+        case .sleep: return "Sleep"
+        case .lock: return "Lock"
+        case .logOut: return "Log Out"
+        }
+    }
 }
 
 enum Power {

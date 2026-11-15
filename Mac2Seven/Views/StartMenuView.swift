@@ -1,45 +1,142 @@
 import SwiftUI
 
+/// Fixed colors that don't change with the theme.
 enum Theme {
-    static let highlightFill = Color(red: 0.80, green: 0.91, blue: 1.0)
-    static let highlightStroke = Color(red: 0.49, green: 0.71, blue: 0.93)
-    static let glassTop = Color(red: 0.12, green: 0.34, blue: 0.48)
-    static let glassBottom = Color(red: 0.04, green: 0.12, blue: 0.22)
-    static let insertionLine = Color(red: 0.10, green: 0.40, blue: 0.90)
     static let folderTint = Color(red: 0.88, green: 0.68, blue: 0.22)
 }
 
-struct StartMenuView: View {
-    var body: some View {
-        HStack(spacing: 0) {
-            LeftColumn()
-                .frame(width: 340)
-                .environment(\.colorScheme, .light)
-            RightColumn()
-                .frame(maxWidth: .infinity)
+/// Every color and shape the menu draws with, worked out from the theme, light/dark and accent color.
+struct Palette {
+    var style: ThemeStyle
+    var dark: Bool
+    var accent: Color
+
+    private var glass: Bool { style == .glass }
+
+    // Shapes
+    var outerCorner: CGFloat { glass ? 14 : 6 }
+    var cardCorner: CGFloat { glass ? 8 : 3 }
+    var rowCorner: CGFloat { glass ? 4 : 2 }
+    var searchCorner: CGFloat { glass ? 6 : 2 }
+
+    // Panel background
+    var useBlur: Bool { glass }
+    var flatBackground: Color { dark ? Color(white: 0.11) : Color(white: 0.90) }
+    var glassTop: Color { Color(red: 0.12, green: 0.34, blue: 0.48) }
+    var glassBottom: Color { Color(red: 0.04, green: 0.12, blue: 0.22) }
+    var outerStroke: Color { glass ? .white.opacity(0.28) : (dark ? .white.opacity(0.10) : .black.opacity(0.15)) }
+
+    // Left column
+    var leftScheme: ColorScheme { dark ? .dark : .light }
+    var cardFill: Color {
+        if glass { return dark ? Color(white: 0.12).opacity(0.94) : Color.white.opacity(0.96) }
+        return dark ? Color(white: 0.17) : .white
+    }
+    var cardStroke: Color {
+        if glass { return dark ? .white.opacity(0.12) : .black.opacity(0.25) }
+        return dark ? .white.opacity(0.05) : .black.opacity(0.06)
+    }
+    var text: Color { dark ? .white.opacity(0.92) : .black.opacity(0.85) }
+    var sectionHeader: Color { dark ? accent.opacity(0.95) : accent }
+    var highlightFill: Color { accent.opacity(glass ? (dark ? 0.32 : 0.16) : (dark ? 0.45 : 0.22)) }
+    var highlightStroke: Color { glass ? accent.opacity(dark ? 0.75 : 0.5) : .clear }
+    var insertionLine: Color { accent }
+    var folderOutline: Color { accent.opacity(0.6) }
+    var searchFill: Color { dark ? Color(white: 0.20) : .white }
+    var searchStroke: Color {
+        if glass { return dark ? .white.opacity(0.15) : .black.opacity(0.3) }
+        return dark ? .white.opacity(0.08) : .black.opacity(0.15)
+    }
+    var arrowTint: Color {
+        if glass { return dark ? Color(red: 0.45, green: 0.8, blue: 0.45) : Color(red: 0.2, green: 0.45, blue: 0.2) }
+        return accent
+    }
+
+    // Right column (always dark on glass; follows light/dark on flat)
+    var rightScheme: ColorScheme { glass || dark ? .dark : .light }
+    private var rightDark: Bool { rightScheme == .dark }
+    var rightText: Color { rightDark ? .white : .black.opacity(0.85) }
+    var rightTextShadow: Color { glass ? .black.opacity(0.5) : .clear }
+    var rightHoverFill: Color { glass ? .white.opacity(0.16) : (rightDark ? .white.opacity(0.10) : .black.opacity(0.07)) }
+    var rightHoverStroke: Color { glass ? .white.opacity(0.35) : .clear }
+    var rightSeparator: Color { rightDark ? .white.opacity(glass ? 0.3 : 0.12) : .black.opacity(0.12) }
+    var pictureFrame: [Color] {
+        glass ? [.white.opacity(0.55), .white.opacity(0.15)]
+              : (rightDark ? [.white.opacity(0.10), .white.opacity(0.10)] : [.black.opacity(0.06), .black.opacity(0.06)])
+    }
+    var buttonFill: [Color] {
+        glass ? [.white.opacity(0.22), .white.opacity(0.06)]
+              : (rightDark ? [.white.opacity(0.10), .white.opacity(0.10)] : [.black.opacity(0.07), .black.opacity(0.07)])
+    }
+    var buttonStroke: Color { glass ? .white.opacity(0.35) : .clear }
+
+    @MainActor
+    static func make(_ prefs: Preferences, systemDark: Bool) -> Palette {
+        let dark: Bool
+        switch prefs.data.appearance {
+        case .system: dark = systemDark
+        case .light: dark = false
+        case .dark: dark = true
         }
-        .padding(8)
-        .frame(width: AppDelegate.panelSize.width, height: AppDelegate.panelSize.height)
-        .background(GlassBackground())
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.28), lineWidth: 1)
-        )
-        .environment(\.colorScheme, .dark)
+        return Palette(style: prefs.data.theme, dark: dark, accent: prefs.accentColor)
     }
 }
 
-struct GlassBackground: View {
+private struct PaletteKey: EnvironmentKey {
+    static let defaultValue = Palette(style: .glass, dark: false, accent: .blue)
+}
+
+extension EnvironmentValues {
+    var palette: Palette {
+        get { self[PaletteKey.self] }
+        set { self[PaletteKey.self] = newValue }
+    }
+}
+
+struct StartMenuView: View {
+    @EnvironmentObject var prefs: Preferences
+    /// The system's light/dark setting (nothing above this view overrides it).
+    @Environment(\.colorScheme) private var systemScheme
+
     var body: some View {
-        ZStack {
-            VisualEffect(material: .hudWindow)
-            LinearGradient(
-                colors: [Theme.glassTop.opacity(0.62), Theme.glassBottom.opacity(0.72)],
-                startPoint: .topLeading, endPoint: .bottomTrailing
-            )
-            // Soft sheen across the top edge.
-            LinearGradient(colors: [.white.opacity(0.14), .clear], startPoint: .top, endPoint: .center)
+        let p = Palette.make(prefs, systemDark: systemScheme == .dark)
+
+        HStack(spacing: 0) {
+            LeftColumn()
+                .frame(width: 340)
+                .environment(\.colorScheme, p.leftScheme)
+            RightColumn()
+                .frame(maxWidth: .infinity)
+                .environment(\.colorScheme, p.rightScheme)
+        }
+        .padding(8)
+        .frame(width: AppDelegate.panelSize.width, height: AppDelegate.panelSize.height)
+        .background(PanelBackground())
+        .clipShape(RoundedRectangle(cornerRadius: p.outerCorner, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: p.outerCorner, style: .continuous)
+                .strokeBorder(p.outerStroke, lineWidth: 1)
+        )
+        .environment(\.palette, p)
+    }
+}
+
+struct PanelBackground: View {
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        if p.useBlur {
+            ZStack {
+                VisualEffect(material: .hudWindow)
+                LinearGradient(
+                    colors: [p.glassTop.opacity(0.62), p.glassBottom.opacity(0.72)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                )
+                // Soft sheen across the top edge.
+                LinearGradient(colors: [.white.opacity(0.14), .clear], startPoint: .top, endPoint: .center)
+            }
+        } else {
+            p.flatBackground
         }
     }
 }
@@ -62,13 +159,14 @@ struct VisualEffect: NSViewRepresentable {
 
 struct RowHighlight: View {
     let active: Bool
+    @Environment(\.palette) private var p
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 4, style: .continuous)
-            .fill(active ? Theme.highlightFill : .clear)
+        RoundedRectangle(cornerRadius: p.rowCorner, style: .continuous)
+            .fill(active ? p.highlightFill : .clear)
             .overlay(
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .strokeBorder(active ? Theme.highlightStroke : .clear, lineWidth: 1)
+                RoundedRectangle(cornerRadius: p.rowCorner, style: .continuous)
+                    .strokeBorder(active ? p.highlightStroke : .clear, lineWidth: 1)
             )
     }
 }

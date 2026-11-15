@@ -163,6 +163,11 @@ final class Library: ObservableObject {
         data.usage[path] = nil
     }
 
+    /// Empties the frequently used list (pins and folders are untouched).
+    func clearHistory() {
+        data.usage = [:]
+    }
+
     // MARK: Pins
 
     func isPinned(_ path: String) -> Bool { data.pinned.contains(path) }

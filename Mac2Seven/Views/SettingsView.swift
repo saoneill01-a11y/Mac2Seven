@@ -1,0 +1,408 @@
+import Carbon.HIToolbox
+import ServiceManagement
+import SwiftUI
+import UniformTypeIdentifiers
+
+struct SettingsView: View {
+    /// Debug: `--settings <tab>` opens on that tab (general, appearance, places, history).
+    @State private var tab: String = {
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--settings"), i + 1 < args.count, !args[i + 1].hasPrefix("--") {
+            return args[i + 1]
+        }
+        return "general"
+    }()
+
+    var body: some View {
+        TabView(selection: $tab) {
+            GeneralSettings()
+                .tabItem { Label("General", systemImage: "gearshape") }
+                .tag("general")
+            AppearanceSettings()
+                .tabItem { Label("Appearance", systemImage: "paintpalette") }
+                .tag("appearance")
+            PlacesSettings()
+                .tabItem { Label("Places", systemImage: "folder") }
+                .tag("places")
+            HistorySettings()
+                .tabItem { Label("History", systemImage: "clock") }
+                .tag("history")
+        }
+        .frame(width: 560, height: 540)
+    }
+}
+
+// MARK: General
+
+struct GeneralSettings: View {
+    @EnvironmentObject var prefs: Preferences
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var loginError: String?
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Launch Mac2Seven at login", isOn: Binding(
+                    get: { launchAtLogin },
+                    set: { setLaunchAtLogin($0) }
+                ))
+                if let loginError {
+                    Text(loginError).font(.caption).foregroundStyle(.red)
+                }
+            }
+
+            Section {
+                LabeledContent("Open the menu with") {
+                    HotkeyRecorder(spec: $prefs.data.hotkey, isRecording: $prefs.isRecordingHotkey)
+                }
+            } footer: {
+                Text("Click the shortcut, then press the new keys. It needs at least one of ⌘ ⌥ ⌃.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
+                Picker("Power button", selection: $prefs.data.powerAction) {
+                    ForEach(PowerAction.allCases) { action in
+                        Text(action.title).tag(action)
+                    }
+                }
+            } footer: {
+                Text("The main button does this; the arrow next to it lists the other options.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear { launchAtLogin = SMAppService.mainApp.status == .enabled }
+    }
+
+    private func setLaunchAtLogin(_ on: Bool) {
+        do {
+            if on { try SMAppService.mainApp.register() } else { try SMAppService.mainApp.unregister() }
+            loginError = nil
+        } catch {
+            loginError = "Couldn't change this: \(error.localizedDescription)"
+        }
+        launchAtLogin = SMAppService.mainApp.status == .enabled
+    }
+}
+
+/// Click, then press a key combination to set the global shortcut.
+struct HotkeyRecorder: View {
+    @Binding var spec: HotkeySpec
+    @Binding var isRecording: Bool
+    @State private var monitor: Any?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Button {
+                isRecording ? stop() : start()
+            } label: {
+                Text(isRecording ? "Press keys…" : spec.display)
+                    .frame(minWidth: 110)
+            }
+            if spec != .default && !isRecording {
+                Button("Reset") { spec = .default }
+                    .buttonStyle(.link)
+            }
+        }
+        .onDisappear { stop() }
+    }
+
+    private func start() {
+        isRecording = true
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let mods = event.modifierFlags.intersection([.command, .option, .control, .shift])
+            if event.keyCode == UInt16(kVK_Escape) && mods.isEmpty {
+                stop()
+                return nil
+            }
+            guard !mods.subtracting(.shift).isEmpty else {
+                NSSound.beep()
+                return nil
+            }
+            spec = HotkeySpec(keyCode: UInt32(event.keyCode),
+                              modifiers: Self.carbonModifiers(mods),
+                              display: Self.symbols(mods) + Self.keyName(event))
+            stop()
+            return nil
+        }
+    }
+
+    private func stop() {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        isRecording = false
+    }
+
+    static func carbonModifiers(_ flags: NSEvent.ModifierFlags) -> UInt32 {
+        var m: UInt32 = 0
+        if flags.contains(.command) { m |= UInt32(cmdKey) }
+        if flags.contains(.option) { m |= UInt32(optionKey) }
+        if flags.contains(.control) { m |= UInt32(controlKey) }
+        if flags.contains(.shift) { m |= UInt32(shiftKey) }
+        return m
+    }
+
+    static func symbols(_ flags: NSEvent.ModifierFlags) -> String {
+        var s = ""
+        if flags.contains(.control) { s += "⌃" }
+        if flags.contains(.option) { s += "⌥" }
+        if flags.contains(.shift) { s += "⇧" }
+        if flags.contains(.command) { s += "⌘" }
+        return s
+    }
+
+    static func keyName(_ event: NSEvent) -> String {
+        let named: [Int: String] = [
+            kVK_Space: "Space", kVK_Return: "Return", kVK_Tab: "Tab", kVK_Delete: "Delete",
+            kVK_LeftArrow: "←", kVK_RightArrow: "→", kVK_UpArrow: "↑", kVK_DownArrow: "↓",
+            kVK_Home: "Home", kVK_End: "End", kVK_PageUp: "Page Up", kVK_PageDown: "Page Down",
+            kVK_F1: "F1", kVK_F2: "F2", kVK_F3: "F3", kVK_F4: "F4", kVK_F5: "F5", kVK_F6: "F6",
+            kVK_F7: "F7", kVK_F8: "F8", kVK_F9: "F9", kVK_F10: "F10", kVK_F11: "F11", kVK_F12: "F12",
+        ]
+        if let name = named[Int(event.keyCode)] { return name }
+        return (event.charactersIgnoringModifiers ?? "?").uppercased()
+    }
+}
+
+// MARK: Appearance
+
+struct AppearanceSettings: View {
+    @EnvironmentObject var prefs: Preferences
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Mode", selection: $prefs.data.appearance) {
+                    ForEach(AppearanceMode.allCases) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section("Theme") {
+                Picker("Theme", selection: $prefs.data.theme) {
+                    ForEach(ThemeStyle.allCases) { style in
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(style.title)
+                            Text(style.summary).font(.caption).foregroundStyle(.secondary)
+                        }
+                        .tag(style)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+                .labelsHidden()
+            }
+
+            Section("Accent color") {
+                Toggle("Use the macOS accent color", isOn: $prefs.data.useSystemAccent)
+                ColorPicker("Custom color", selection: Binding(
+                    get: { Color(hex: prefs.data.accentHex) ?? .blue },
+                    set: { prefs.data.accentHex = $0.hexString }
+                ), supportsOpacity: false)
+                .disabled(prefs.data.useSystemAccent)
+            }
+
+            Section {
+                Text("Open the menu (\(prefs.data.hotkey.display)) to see your changes; they apply right away.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+    }
+}
+
+// MARK: Places
+
+struct PlacesSettings: View {
+    @EnvironmentObject var prefs: Preferences
+    @State private var selection: UUID?
+    @State private var oneDriveRoots: [URL] = OneDrive.roots()
+    @State private var chosenRoot: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("These show in the right-hand column of the menu. Drag to reorder; click a name to rename it.")
+                .font(.callout).foregroundStyle(.secondary)
+
+            List(selection: $selection) {
+                ForEach($prefs.data.places) { $place in
+                    PlaceEditorRow(place: $place).tag(place.id)
+                }
+                .onMove { prefs.data.places.move(fromOffsets: $0, toOffset: $1) }
+                .onDelete { prefs.data.places.remove(atOffsets: $0) }
+            }
+            .listStyle(.bordered(alternatesRowBackgrounds: true))
+            .frame(minHeight: 230)
+
+            HStack {
+                Button("Add Folder…", action: addFolder)
+                Button("Add App…", action: addApp)
+                Button("Add Separator") { insert([.separator()]) }
+                Spacer()
+                Button("Remove", role: .destructive) {
+                    prefs.data.places.removeAll { $0.id == selection }
+                    selection = nil
+                }
+                .disabled(selection == nil)
+            }
+
+            GroupBox("OneDrive") {
+                VStack(alignment: .leading, spacing: 8) {
+                    if oneDriveRoots.isEmpty {
+                        Text("No OneDrive folders found on this Mac.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Point Documents, Pictures and Desktop at your OneDrive copies, and add a OneDrive entry.")
+                            .font(.callout).foregroundStyle(.secondary)
+                        HStack {
+                            if oneDriveRoots.count > 1 {
+                                Picker("Account", selection: $chosenRoot) {
+                                    ForEach(oneDriveRoots, id: \.path) { root in
+                                        Text(OneDrive.displayName(root)).tag(root.path)
+                                    }
+                                }
+                                .frame(maxWidth: 260)
+                            } else {
+                                Text(OneDrive.displayName(oneDriveRoots[0]))
+                            }
+                            Spacer()
+                            if OneDrive.isUsing(prefs.data.places) {
+                                Button("Switch Back to Mac Folders") {
+                                    prefs.data.places = OneDrive.revert(prefs.data.places)
+                                }
+                            }
+                            Button("Use OneDrive Folders") {
+                                let root = oneDriveRoots.first { $0.path == chosenRoot } ?? oneDriveRoots[0]
+                                prefs.data.places = OneDrive.apply(root: root, to: prefs.data.places)
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(4)
+            }
+
+            HStack {
+                Spacer()
+                Button("Restore Default Places") {
+                    prefs.data.places = PrefsData.defaultPlaces()
+                    selection = nil
+                }
+            }
+        }
+        .padding(20)
+        .onAppear {
+            oneDriveRoots = OneDrive.roots()
+            if chosenRoot.isEmpty { chosenRoot = OneDrive.bestRoot(oneDriveRoots)?.path ?? "" }
+        }
+    }
+
+    /// Adds new places just after the selected one, or at the end.
+    private func insert(_ places: [Place]) {
+        if let selection, let i = prefs.data.places.firstIndex(where: { $0.id == selection }) {
+            prefs.data.places.insert(contentsOf: places, at: i + 1)
+        } else {
+            prefs.data.places.append(contentsOf: places)
+        }
+        selection = places.last?.id
+    }
+
+    private func addFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Add"
+        guard panel.runModal() == .OK else { return }
+        insert(panel.urls.map { Place(title: FileManager.default.displayName(atPath: $0.path), path: $0.path) })
+    }
+
+    private func addApp() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.application]
+        panel.allowsMultipleSelection = true
+        panel.directoryURL = URL(fileURLWithPath: "/Applications")
+        panel.prompt = "Add"
+        guard panel.runModal() == .OK else { return }
+        insert(panel.urls.map { url in
+            var name = FileManager.default.displayName(atPath: url.path)
+            if name.hasSuffix(".app") { name = String(name.dropLast(4)) }
+            return Place(title: name, path: url.path)
+        })
+    }
+}
+
+struct PlaceEditorRow: View {
+    @Binding var place: Place
+
+    var body: some View {
+        if place.isSeparator {
+            HStack {
+                Rectangle().fill(.secondary.opacity(0.4)).frame(height: 1)
+                Text("Separator").font(.caption).foregroundStyle(.secondary)
+                Rectangle().fill(.secondary.opacity(0.4)).frame(height: 1)
+            }
+            .padding(.vertical, 4)
+        } else {
+            HStack(spacing: 8) {
+                Image(nsImage: IconCache.icon(place.path))
+                    .resizable()
+                    .frame(width: 18, height: 18)
+                TextField("Name", text: $place.title)
+                    .textFieldStyle(.plain)
+                    .fontWeight(place.bold ? .semibold : .regular)
+                    .frame(maxWidth: 170, alignment: .leading)
+                Text(place.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                    .font(.caption)
+                    .foregroundStyle(FileManager.default.fileExists(atPath: place.path) ? Color.secondary : Color.red)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer(minLength: 0)
+            }
+            .contextMenu {
+                Toggle("Bold", isOn: $place.bold)
+                Button("Show in Finder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([place.url])
+                }
+            }
+        }
+    }
+}
+
+// MARK: History
+
+struct HistorySettings: View {
+    @EnvironmentObject var prefs: Preferences
+    @EnvironmentObject var library: Library
+    @State private var confirmClear = false
+
+    var body: some View {
+        Form {
+            Section {
+                Stepper(value: $prefs.data.frequentCount, in: 0...20) {
+                    LabeledContent("Frequently used apps to show",
+                                   value: prefs.data.frequentCount == 0 ? "None" : "\(prefs.data.frequentCount)")
+                }
+            } footer: {
+                Text("Shown under your pinned apps. Set to None to hide the list.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Launch history") {
+                    Button("Clear History…") { confirmClear = true }
+                }
+            } footer: {
+                Text("Empties the frequently used list. Pinned apps and folders aren't affected.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .confirmationDialog("Clear the frequently used list?", isPresented: $confirmClear) {
+            Button("Clear History", role: .destructive) { library.clearHistory() }
+        } message: {
+            Text("Apps will reappear as you use them. This can't be undone.")
+        }
+    }
+}

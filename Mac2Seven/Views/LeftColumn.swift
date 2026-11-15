@@ -5,6 +5,7 @@ struct LeftColumn: View {
     @EnvironmentObject var catalog: AppCatalog
     @EnvironmentObject var library: Library
     @EnvironmentObject var files: FileSearch
+    @Environment(\.palette) private var p
     @FocusState private var searchFocused: Bool
 
     private var hits: [SearchHit] {
@@ -33,13 +34,13 @@ struct LeftColumn: View {
                 .frame(maxHeight: .infinity, alignment: .top)
             }
             .background(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color.white.opacity(0.96))
+                RoundedRectangle(cornerRadius: p.cardCorner, style: .continuous)
+                    .fill(p.cardFill)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: p.cardCorner, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .strokeBorder(Color.black.opacity(0.25), lineWidth: 1)
+                RoundedRectangle(cornerRadius: p.cardCorner, style: .continuous)
+                    .strokeBorder(p.cardStroke, lineWidth: 1)
             )
         }
         .onChange(of: state.query) { _, q in
@@ -58,9 +59,10 @@ struct LeftColumn: View {
             HStack(spacing: 8) {
                 Image(systemName: state.showingAll ? "arrowtriangle.left.fill" : "arrowtriangle.right.fill")
                     .font(.system(size: 9))
-                    .foregroundStyle(Color(red: 0.2, green: 0.45, blue: 0.2))
+                    .foregroundStyle(p.arrowTint)
                 Text(state.showingAll ? "Back" : "All Programs")
                     .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(p.text)
                 Spacer()
             }
             .padding(.horizontal, 12)
@@ -87,10 +89,10 @@ struct LeftColumn: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
-        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.white))
+        .background(RoundedRectangle(cornerRadius: p.searchCorner, style: .continuous).fill(p.searchFill))
         .overlay(
-            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .strokeBorder(Color.black.opacity(0.3), lineWidth: 1)
+            RoundedRectangle(cornerRadius: p.searchCorner, style: .continuous)
+                .strokeBorder(p.searchStroke, lineWidth: 1)
         )
         .padding(.horizontal, 6)
         .padding(.top, 2)
@@ -125,11 +127,13 @@ struct HomeListView: View {
     @EnvironmentObject var library: Library
     @EnvironmentObject var catalog: AppCatalog
     @EnvironmentObject var state: MenuState
+    @EnvironmentObject var prefs: Preferences
     @State private var dropTarget = false
 
     var body: some View {
         let pinned = library.data.pinned.compactMap { catalog.item(for: $0) }
-        let frequent = library.frequent().compactMap { catalog.item(for: $0) }
+        let showFrequent = prefs.data.frequentCount > 0
+        let frequent = showFrequent ? library.frequent(limit: prefs.data.frequentCount).compactMap { catalog.item(for: $0) } : []
 
         ScrollView {
             VStack(alignment: .leading, spacing: 1) {
@@ -139,10 +143,12 @@ struct HomeListView: View {
                             library.placePins(paths, relativeTo: item.path, edge: edge)
                         }
                 }
-                if !pinned.isEmpty {
+                if !pinned.isEmpty && showFrequent {
                     Divider().padding(.vertical, 6).padding(.horizontal, 6)
                 }
-                if frequent.isEmpty {
+                if !showFrequent {
+                    EmptyView()
+                } else if frequent.isEmpty {
                     Text("Apps you open will show up here.")
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -174,6 +180,7 @@ struct AppRow: View {
 
     @EnvironmentObject var library: Library
     @EnvironmentObject var state: MenuState
+    @Environment(\.palette) private var p
 
     private var hoverKey: String { "app:" + item.path }
     private var highlighted: Bool { selected || (state.hoveredID == hoverKey && !state.isDragging) }
@@ -186,7 +193,7 @@ struct AppRow: View {
                 .frame(width: iconSize, height: iconSize)
             Text(item.name)
                 .font(.system(size: iconSize > 20 ? 13 : 12, weight: bold ? .semibold : .regular))
-                .foregroundStyle(Color.black.opacity(0.85))
+                .foregroundStyle(p.text)
                 .lineLimit(1)
             Spacer(minLength: 0)
         }

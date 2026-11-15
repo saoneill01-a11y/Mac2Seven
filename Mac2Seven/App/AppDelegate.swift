@@ -1,6 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
-import ServiceManagement
+import Combine
 import SwiftUI
 
 @main
@@ -20,12 +20,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let library = Library()
     let menuState = MenuState()
     let fileSearch = FileSearch()
+    let prefs = Preferences()
 
     private var statusItem: NSStatusItem!
     private var panel: StartPanel!
     private var hotKey: HotKey?
     private var keyMonitor: Any?
     private var lastClose = Date.distantPast
+    private var settingsWindow: NSWindow?
+    private var cancellables = Set<AnyCancellable>()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         library.load()
@@ -39,15 +42,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environmentObject(library)
             .environmentObject(menuState)
             .environmentObject(fileSearch)
+            .environmentObject(prefs)
         panel = StartPanel(size: Self.panelSize, content: root)
         panel.onDismiss = { [weak self] in self?.closePanel() }
 
         setUpStatusItem()
-        hotKey = HotKey(keyCode: UInt32(kVK_Space), modifiers: UInt32(optionKey)) { [weak self] in
-            self?.toggle(fromStatusItem: false)
-        }
+        // Follow the shortcut setting; switch it off while a new one is being recorded.
+        prefs.$data.map(\.hotkey).removeDuplicates()
+            .combineLatest(prefs.$isRecordingHotkey.removeDuplicates())
+            .sink { [weak self] spec, recording in
+                self?.registerHotKey(recording ? nil : spec)
+            }
+            .store(in: &cancellables)
         installKeyMonitor()
 
+        if CommandLine.arguments.contains("--settings") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.openSettings() }
+        }
         if CommandLine.arguments.contains("--open") {
             // Debug helpers: --open [--query text | --all]
             let args = CommandLine.arguments
@@ -87,18 +98,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func showStatusMenu() {
         closePanel()
         let menu = NSMenu()
-        let open = NSMenuItem(title: "Open Start Menu  (⌥Space)", action: #selector(openFromMenu), keyEquivalent: "")
+        let open = NSMenuItem(title: "Open Start Menu  (\(prefs.data.hotkey.display))", action: #selector(openFromMenu), keyEquivalent: "")
         open.target = self
         menu.addItem(open)
         menu.addItem(.separator())
-        let login = NSMenuItem(title: "Launch at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
-        login.target = self
-        login.state = SMAppService.mainApp.status == .enabled ? .on : .off
-        menu.addItem(login)
-        let rescan = NSMenuItem(title: "Rescan Applications", action: #selector(rescan), keyEquivalent: "")
-        rescan.target = self
-        menu.addItem(rescan)
-        let reveal = NSMenuItem(title: "Show Settings File", action: #selector(revealLibrary), keyEquivalent: "")
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
+        let reveal = NSMenuItem(title: "Show Data Folder", action: #selector(revealLibrary), keyEquivalent: "")
         reveal.target = self
         menu.addItem(reveal)
         menu.addItem(.separator())
@@ -111,22 +118,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openFromMenu() { openPanel() }
 
-    @objc private func toggleLaunchAtLogin() {
-        do {
-            if SMAppService.mainApp.status == .enabled {
-                try SMAppService.mainApp.unregister()
-            } else {
-                try SMAppService.mainApp.register()
-            }
-        } catch {
-            NSLog("Mac2Seven launch-at-login change failed: \(error)")
-        }
+    @objc private func revealLibrary() {
+        // The folder holding library.json (pins, folders, history) and settings.json.
+        NSWorkspace.shared.activateFileViewerSelecting([library.fileURL, prefs.fileURL])
     }
 
-    @objc private func rescan() { catalog.refresh() }
+    // MARK: Settings window
 
-    @objc private func revealLibrary() {
-        NSWorkspace.shared.activateFileViewerSelecting([library.fileURL])
+    @objc func openSettings() {
+        closePanel()
+        if settingsWindow == nil {
+            let view = SettingsView()
+                .environmentObject(prefs)
+                .environmentObject(library)
+            let window = NSWindow(contentViewController: NSHostingController(rootView: view))
+            window.title = "Mac2Seven Settings"
+            window.styleMask = [.titled, .closable, .miniaturizable]
+            window.isReleasedWhenClosed = false
+            window.center()
+            settingsWindow = window
+        }
+        NSApp.activate()
+        settingsWindow?.makeKeyAndOrderFront(nil)
+    }
+
+    // MARK: Hotkey
+
+    private func registerHotKey(_ spec: HotkeySpec?) {
+        hotKey = nil
+        guard let spec else { return }
+        hotKey = HotKey(keyCode: spec.keyCode, modifiers: spec.modifiers) { [weak self] in
+            self?.toggle(fromStatusItem: false)
+        }
     }
 
     // MARK: Panel
@@ -188,6 +211,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return nil
             case kVK_UpArrow where !state.query.isEmpty:
                 state.selection = max(state.selection - 1, 0)
+                return nil
+            case kVK_ANSI_Comma where event.modifierFlags.contains(.command):
+                self.openSettings()
                 return nil
             default:
                 return event
