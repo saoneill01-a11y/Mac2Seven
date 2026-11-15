@@ -55,6 +55,9 @@ final class TaskbarController {
     private var previewHovered = false
     private var cancellables = Set<AnyCancellable>()
     private var screenObserver: NSObjectProtocol?
+    private var rightClickMonitor: Any?
+    /// The button that was right-clicked; no preview for it until the pointer leaves it.
+    private var previewSuppressedFor: String?
 
     /// Opens the Start menu above the given button frame (screen coordinates).
     var onStart: (NSRect) -> Void = { _ in }
@@ -68,6 +71,17 @@ final class TaskbarController {
         prefs.$data.map(\.taskbar).removeDuplicates()
             .sink { [weak self] settings in self?.apply(settings) }
             .store(in: &cancellables)
+        // A right-click (or Control-click) on the bar opens a menu: close the preview so it can't cover it,
+        // and keep it closed until the pointer moves on to another button.
+        rightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            let isMenuClick = event.type == .rightMouseDown || event.modifierFlags.contains(.control)
+            if isMenuClick, self.bars.contains(where: { $0.frame.contains(NSEvent.mouseLocation) }) {
+                self.hidePreviewNow()
+                self.previewSuppressedFor = self.hoverModel.hoveredID
+            }
+            return event
+        }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -231,7 +245,8 @@ final class TaskbarController {
     private func setHovered(_ id: String?, target: PreviewTarget?, rect: NSRect, notify: Bool = true) {
         guard hoverModel.hoveredID != id else { return }
         hoverModel.hoveredID = id
-        if notify { hover(target, rect) }
+        if id != previewSuppressedFor { previewSuppressedFor = nil }
+        if notify { hover(previewSuppressedFor == nil ? target : nil, rect) }
     }
 
     private func set(card: CGWindowID?, close: Bool) {
