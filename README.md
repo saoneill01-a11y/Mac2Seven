@@ -6,7 +6,7 @@ A menu bar app launcher with a classic two-column Start-menu layout.
   <img src="Marketing/mac2seven-menu-light.png" alt="The Mac2Seven menu: search, pinned and frequently used apps on the left, places and a Shut down button on the right" width="440">
 </p>
 
-**[Download Mac2Seven](https://github.com/saoneill01-a11y/Mac2Seven/releases/latest/download/Mac2Seven.zip)** · macOS 14 or later · signed and notarized
+**[Download Mac2Seven](https://github.com/saoneill01-a11y/Mac2Seven/releases/latest/download/Mac2Seven.dmg)** · macOS 14 or later · signed and notarized
 
 ## Use
 - **Open:** click the menu bar icon, or press **⌥Space** anywhere.
@@ -50,6 +50,6 @@ Debug-build launch flags (not in Release builds): `--open`, `--open --query text
 2. Write the release notes in `Tools/release-notes/vX.Y.md`.
 3. Commit and push.
 4. `Tools/release.sh` does a dry run: universal build, Developer ID signing, notarization, stapling, and a signed Sparkle feed in `dist/vX.Y/`.
-5. `Tools/release.sh --publish` does the same and creates the GitHub release with `Mac2Seven-X.Y.zip`, `Mac2Seven.zip` and `appcast.xml`. Installed copies find it through `releases/latest/download/appcast.xml`.
+5. `Tools/release.sh --publish` does the same and creates the GitHub release with `Mac2Seven-X.Y.zip`, `Mac2Seven.zip` (for updates), `Mac2Seven.dmg` (for the website download) and `appcast.xml`. Installed copies find it through `releases/latest/download/appcast.xml`.
 
 This needs, on the releasing Mac: the Developer ID certificate, the `Mac2Seven-notary` notarytool profile, and the Sparkle private key in the keychain under the `Mac2Seven` account. Keep a backup of that key; without it, installed copies can't accept updates.
