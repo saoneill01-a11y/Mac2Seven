@@ -113,3 +113,18 @@ enum Power {
         shell("/usr/bin/pmset", ["displaysleepnow"])
     }
 }
+
+/// Where library.json and settings.json live.
+enum DataFolder {
+    static var url: URL {
+        #if DEBUG
+        // Debug only: --data-dir <path> keeps test runs away from your real pins and settings.
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--data-dir"), i + 1 < args.count {
+            return URL(fileURLWithPath: args[i + 1], isDirectory: true)
+        }
+        #endif
+        return FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Mac2Seven", isDirectory: true)
+    }
+}

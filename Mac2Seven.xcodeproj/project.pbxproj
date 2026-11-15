@@ -8,13 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		000E30DAD35FD09A61D3EE15 /* LeftColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42CC5BE6A569B3CA01C33C2C /* LeftColumn.swift */; };
+		1E1BBD76B54B702328FD67F7 /* TaskbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3455BFF9A0D5444083083D0F /* TaskbarView.swift */; };
+		33AA3E312DB957E46181CF0F /* Thumbnails.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C11D5C63395BB9E30684FB /* Thumbnails.swift */; };
 		3651CFF1484ACF89FE626647 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87F46FFAF127D98C0EAB6A3 /* Preferences.swift */; };
+		38FAF05EF319A4169D840B60 /* TaskbarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 928AD9240009A93040424271 /* TaskbarController.swift */; };
 		4200B9A2E5A8968DD2F1AAA7 /* SearchAndRightColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = D364158F6DC338730D0FF830 /* SearchAndRightColumn.swift */; };
 		431F67D4699102778BFFC49C /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32815DEA3C3856C2B8A5986 /* Backup.swift */; };
 		6242C5A412A5279583A0CD86 /* AppCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F3BF12325DFF4ACD1BAF880 /* AppCatalog.swift */; };
 		7530BF57B18657E104B826D1 /* StartMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653F4C4BAAA8592540565A82 /* StartMenuView.swift */; };
 		75C92CE765CB61CC4A6FF0B0 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 8B7850415F08BE281F8BD511 /* Sparkle */; };
 		7C352E8D80CC4B40FBFDC30F /* AllProgramsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6316497295C014241E62D7C3 /* AllProgramsView.swift */; };
+		7E4E70F180D1DBE0F398CE10 /* TaskbarSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0364743BBD73907B05F3FB3 /* TaskbarSettingsView.swift */; };
 		94A260F911A73D6FE1CF8AE2 /* DemoMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8DF7E202177E764273815130 /* DemoMode.swift */; };
 		9A2E41F551B469A0AB71EDC6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F718B9001D0F45E55C38F075 /* AppDelegate.swift */; };
 		ADAD85BC64204D246FEA5BA2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6CC1C066F36CD7D402CA5EA5 /* Assets.xcassets */; };
@@ -24,6 +28,7 @@
 		C4C542B8C22FE43502002435 /* Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E89C51B8DC0E6F03BCF288 /* Search.swift */; };
 		D62626520B93CB0ECFA861F6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 048179323729F6280BE3BFEB /* SettingsView.swift */; };
 		DB8CE3AA2C842399F92C18D5 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BB724A2AC69DFFA0B1AAC60 /* Library.swift */; };
+		F3D131D436BF613866B71133 /* WindowTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C84DFCD7D10937F4CB9071 /* WindowTracker.swift */; };
 		F7C0FC80408C1F3D0D1196A3 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2828B6F54B0E7353986822BF /* Updater.swift */; };
 /* End PBXBuildFile section */
 
@@ -31,6 +36,7 @@
 		048179323729F6280BE3BFEB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		06A9C6B37692DF37A3BC41FC /* Mac2Seven.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mac2Seven.entitlements; sourceTree = "<group>"; };
 		2828B6F54B0E7353986822BF /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
+		3455BFF9A0D5444083083D0F /* TaskbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskbarView.swift; sourceTree = "<group>"; };
 		42CC5BE6A569B3CA01C33C2C /* LeftColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeftColumn.swift; sourceTree = "<group>"; };
 		42E89C51B8DC0E6F03BCF288 /* Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search.swift; sourceTree = "<group>"; };
 		4BB724A2AC69DFFA0B1AAC60 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
@@ -40,12 +46,16 @@
 		653F4C4BAAA8592540565A82 /* StartMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartMenuView.swift; sourceTree = "<group>"; };
 		6CC1C066F36CD7D402CA5EA5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		8DF7E202177E764273815130 /* DemoMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoMode.swift; sourceTree = "<group>"; };
+		928AD9240009A93040424271 /* TaskbarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskbarController.swift; sourceTree = "<group>"; };
 		92F0289B8281C70164926919 /* Mac2Seven.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mac2Seven.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FEC946AD0BB9DDCB287A3B3 /* SystemSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSupport.swift; sourceTree = "<group>"; };
 		C3FE17F28C79981EE745CC10 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C59832C26A5B28BB9BF7CA6B /* AutoScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScroll.swift; sourceTree = "<group>"; };
 		C87F46FFAF127D98C0EAB6A3 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
+		C8C11D5C63395BB9E30684FB /* Thumbnails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Thumbnails.swift; sourceTree = "<group>"; };
 		D364158F6DC338730D0FF830 /* SearchAndRightColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchAndRightColumn.swift; sourceTree = "<group>"; };
+		E0364743BBD73907B05F3FB3 /* TaskbarSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskbarSettingsView.swift; sourceTree = "<group>"; };
+		E5C84DFCD7D10937F4CB9071 /* WindowTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTracker.swift; sourceTree = "<group>"; };
 		F32815DEA3C3856C2B8A5986 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		F718B9001D0F45E55C38F075 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -123,9 +133,22 @@
 				5E4482498FDBEC78DC6EFE9F /* App */,
 				292691D437FE29C9BCD04D33 /* Models */,
 				5860CA169C866B65B354D617 /* System */,
+				D5E001A45C58602CA855F490 /* Taskbar */,
 				1461D69A62A090B6EEE8243A /* Views */,
 			);
 			path = Mac2Seven;
+			sourceTree = "<group>";
+		};
+		D5E001A45C58602CA855F490 /* Taskbar */ = {
+			isa = PBXGroup;
+			children = (
+				928AD9240009A93040424271 /* TaskbarController.swift */,
+				E0364743BBD73907B05F3FB3 /* TaskbarSettingsView.swift */,
+				3455BFF9A0D5444083083D0F /* TaskbarView.swift */,
+				C8C11D5C63395BB9E30684FB /* Thumbnails.swift */,
+				E5C84DFCD7D10937F4CB9071 /* WindowTracker.swift */,
+			);
+			path = Taskbar;
 			sourceTree = "<group>";
 		};
 		E52E8189E8465AE9B93F2E66 /* Products */ = {
@@ -223,7 +246,12 @@
 				D62626520B93CB0ECFA861F6 /* SettingsView.swift in Sources */,
 				7530BF57B18657E104B826D1 /* StartMenuView.swift in Sources */,
 				B1E5D9B97B7BA9AE6BEAED88 /* SystemSupport.swift in Sources */,
+				38FAF05EF319A4169D840B60 /* TaskbarController.swift in Sources */,
+				7E4E70F180D1DBE0F398CE10 /* TaskbarSettingsView.swift in Sources */,
+				1E1BBD76B54B702328FD67F7 /* TaskbarView.swift in Sources */,
+				33AA3E312DB957E46181CF0F /* Thumbnails.swift in Sources */,
 				F7C0FC80408C1F3D0D1196A3 /* Updater.swift in Sources */,
+				F3D131D436BF613866B71133 /* WindowTracker.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

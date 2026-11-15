@@ -66,8 +66,7 @@ final class Library: ObservableObject {
     private let ownPath = Bundle.main.bundlePath
 
     init() {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Mac2Seven", isDirectory: true)
+        let dir = DataFolder.url
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         fileURL = dir.appendingPathComponent("library.json")
     }

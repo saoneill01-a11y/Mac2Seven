@@ -53,6 +53,56 @@ struct Place: Codable, Identifiable, Equatable {
     static func separator() -> Place { Place(title: "", path: "", isSeparator: true) }
 }
 
+enum TaskbarAlignment: String, Codable, CaseIterable, Identifiable {
+    case center, left
+    var id: String { rawValue }
+    var title: String { self == .center ? "Center" : "Left" }
+}
+
+enum TaskbarButtons: String, Codable, CaseIterable, Identifiable {
+    case combine, combineLabels, labels
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .combine: return "Combine (icons only)"
+        case .combineLabels: return "Combine (with app names)"
+        case .labels: return "Never combine (window titles)"
+        }
+    }
+}
+
+struct TaskbarSettings: Codable, Equatable {
+    var enabled = false
+    var alignment: TaskbarAlignment = .center
+    var rows = 1
+    var buttons: TaskbarButtons = .combine
+    var allDisplays = true
+    var keepWindowsClear = true
+    var showPreviews = true
+    var pinned: [String] = TaskbarSettings.defaultPins()
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = TaskbarSettings()
+        enabled = (try? c.decodeIfPresent(Bool.self, forKey: .enabled)) ?? d.enabled
+        alignment = (try? c.decodeIfPresent(TaskbarAlignment.self, forKey: .alignment)) ?? d.alignment
+        rows = min(max((try? c.decodeIfPresent(Int.self, forKey: .rows)) ?? d.rows, 1), 3)
+        buttons = (try? c.decodeIfPresent(TaskbarButtons.self, forKey: .buttons)) ?? d.buttons
+        allDisplays = (try? c.decodeIfPresent(Bool.self, forKey: .allDisplays)) ?? d.allDisplays
+        keepWindowsClear = (try? c.decodeIfPresent(Bool.self, forKey: .keepWindowsClear)) ?? d.keepWindowsClear
+        showPreviews = (try? c.decodeIfPresent(Bool.self, forKey: .showPreviews)) ?? d.showPreviews
+        pinned = (try? c.decodeIfPresent([String].self, forKey: .pinned)) ?? d.pinned
+    }
+
+    static func defaultPins() -> [String] {
+        ["/System/Library/CoreServices/Finder.app", "/Applications/Safari.app", "/System/Applications/Mail.app",
+         "/System/Applications/Calendar.app", "/System/Applications/Messages.app", "/System/Applications/Music.app"]
+            .filter { FileManager.default.fileExists(atPath: $0) }
+    }
+}
+
 struct PrefsData: Codable, Equatable {
     var appearance: AppearanceMode = .system
     var theme: ThemeStyle = .glass
@@ -63,6 +113,7 @@ struct PrefsData: Codable, Equatable {
     var powerAction: PowerAction = .shutDown
     var frequentCount = 10
     var autoHideHelpers = true
+    var taskbar = TaskbarSettings()
 
     init() {}
 
@@ -79,6 +130,7 @@ struct PrefsData: Codable, Equatable {
         powerAction = (try? c.decodeIfPresent(PowerAction.self, forKey: .powerAction)) ?? d.powerAction
         frequentCount = (try? c.decodeIfPresent(Int.self, forKey: .frequentCount)) ?? d.frequentCount
         autoHideHelpers = (try? c.decodeIfPresent(Bool.self, forKey: .autoHideHelpers)) ?? d.autoHideHelpers
+        taskbar = (try? c.decodeIfPresent(TaskbarSettings.self, forKey: .taskbar)) ?? d.taskbar
     }
 
     static func defaultPlaces() -> [Place] {
@@ -115,8 +167,7 @@ final class Preferences: ObservableObject {
     let fileURL: URL
 
     init() {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Mac2Seven", isDirectory: true)
+        let dir = DataFolder.url
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         fileURL = dir.appendingPathComponent("settings.json")
         if FileManager.default.fileExists(atPath: fileURL.path) {
