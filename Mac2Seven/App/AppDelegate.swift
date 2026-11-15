@@ -88,11 +88,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let tab = i + 1 < args.count && !args[i + 1].hasPrefix("--") ? args[i + 1] : "general"
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.openSettings(tab: tab) }
         }
+        if CommandLine.arguments.contains("--calendar") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.taskbar.showCalendarForTesting() }
+        }
         if CommandLine.arguments.contains("--open") {
-            // Debug helpers: --open [--query text | --all]
+            // Debug helpers: --open [--bottom] [--query text | --all]
             let args = CommandLine.arguments
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.openPanel()
+                self.openPanel(fromBottom: args.contains("--bottom"))
                 if let i = args.firstIndex(of: "--query"), i + 1 < args.count {
                     self.menuState.query = args[i + 1]
                 } else if args.contains("--all") {
@@ -265,7 +268,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let x = prefs.data.taskbar.alignment == .left ? button.minX : button.minX - 8
         let origin = NSPoint(x: min(max(x, f.minX + 8), f.maxX - size.width - 8),
                              y: f.minY + taskbar.barHeight + 8)
-        openPanel(at: origin)
+        openPanel(at: origin, fromBottom: true)
     }
 
     // MARK: Hotkey
@@ -290,9 +293,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openPanel()
     }
 
-    func openPanel(at origin: NSPoint? = nil) {
+    func openPanel(at origin: NSPoint? = nil, fromBottom: Bool = false) {
         catalog.refresh()
         menuState.reset()
+        menuState.fromBottom = fromBottom
         taskbar.hidePreviewNow()
         panel.setFrameOrigin(origin ?? panelOrigin())
         panel.makeKeyAndOrderFront(nil)

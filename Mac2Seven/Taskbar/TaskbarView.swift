@@ -24,6 +24,8 @@ struct TaskbarActions {
     var showPreview: (PreviewTarget, NSRect) -> Void
     var hidePreview: () -> Void
     var openSettings: () -> Void
+    /// Opens or closes the calendar above the clock (given in screen coordinates).
+    var calendar: (NSRect) -> Void
 }
 
 struct TaskbarView: View {
@@ -93,7 +95,11 @@ struct TaskbarView: View {
     private var fitted: Fit {
         let rowWidth = barFrame.width - (settings.alignment == .center ? 2 * Self.trayWidth : Self.trayWidth + 6)
         let rows = settings.rows
-        let apps = tracker.apps
+        // Optionally drop running apps with no open windows (unless pinned), like Windows does when you
+        // close an app's last window. Only when windows can be seen at all, or every app would vanish.
+        let apps = settings.hideWindowless && tracker.hasAccessibility
+            ? tracker.apps.filter { $0.pinned || !$0.windows.isEmpty }
+            : tracker.apps
 
         func buttons(combining combined: Set<String>) -> [TaskButton] {
             apps.flatMap { app -> [TaskButton] in
@@ -101,7 +107,8 @@ struct TaskbarView: View {
                     return app.windows.map { TaskButton(app: app, window: $0) }
                 }
                 // Combined with app names: running apps get a full-width button; pinned-only apps stay icons.
-                return [TaskButton(app: app, window: nil, appLabel: settings.buttons == .combineLabels && app.isRunning)]
+                // Only apps with a window open get a name; a running app with none is a plain icon (with its dot).
+                return [TaskButton(app: app, window: nil, appLabel: settings.buttons == .combineLabels && !app.windows.isEmpty)]
             }
         }
         func widths(_ list: [TaskButton], _ label: CGFloat) -> [CGFloat] {
@@ -490,9 +497,7 @@ struct TrayView: View {
                 .background(ButtonChrome(hovering: clockHover, pressedLook: false))
                 .contentShape(Rectangle())
                 .background(ScreenFrameReader(barFrame: barFrame, frame: $clockFrame, id: "clock", target: nil, actions: actions))
-                .onTapGesture {
-                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
-                }
+                .onTapGesture { actions.calendar(clockFrame) }
             }
             // Thin strip at the far edge: Show Desktop.
             Rectangle()

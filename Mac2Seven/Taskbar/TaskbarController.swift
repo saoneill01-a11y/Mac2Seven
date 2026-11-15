@@ -55,6 +55,9 @@ final class TaskbarController {
     private var previewHovered = false
     private var cancellables = Set<AnyCancellable>()
     private var screenObserver: NSObjectProtocol?
+    private var rightClickMonitor: Any?
+    /// The button that was right-clicked; no preview for it until the pointer leaves it.
+    private var previewSuppressedFor: String?
 
     /// Opens the Start menu above the given button frame (screen coordinates).
     var onStart: (NSRect) -> Void = { _ in }
@@ -68,6 +71,17 @@ final class TaskbarController {
         prefs.$data.map(\.taskbar).removeDuplicates()
             .sink { [weak self] settings in self?.apply(settings) }
             .store(in: &cancellables)
+        // A right-click (or Control-click) on the bar opens a menu: close the preview so it can't cover it,
+        // and keep it closed until the pointer moves on to another button.
+        rightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: [.rightMouseDown, .leftMouseDown]) { [weak self] event in
+            guard let self else { return event }
+            let isMenuClick = event.type == .rightMouseDown || event.modifierFlags.contains(.control)
+            if isMenuClick, self.bars.contains(where: { $0.frame.contains(NSEvent.mouseLocation) }) {
+                self.hidePreviewNow()
+                self.previewSuppressedFor = self.hoverModel.hoveredID
+            }
+            return event
+        }
         screenObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
@@ -157,7 +171,8 @@ final class TaskbarController {
             },
             showPreview: { [weak self] target, rect in self?.showPreview(target, at: rect) },
             hidePreview: { [weak self] in self?.hidePreviewNow() },
-            openSettings: { [weak self] in self?.onOpenSettings() }
+            openSettings: { [weak self] in self?.onOpenSettings() },
+            calendar: { [weak self] rect in self?.toggleCalendar(below: rect) }
         )
     }
 
@@ -230,7 +245,8 @@ final class TaskbarController {
     private func setHovered(_ id: String?, target: PreviewTarget?, rect: NSRect, notify: Bool = true) {
         guard hoverModel.hoveredID != id else { return }
         hoverModel.hoveredID = id
-        if notify { hover(target, rect) }
+        if id != previewSuppressedFor { previewSuppressedFor = nil }
+        if notify { hover(previewSuppressedFor == nil ? target : nil, rect) }
     }
 
     private func set(card: CGWindowID?, close: Bool) {
@@ -309,6 +325,79 @@ final class TaskbarController {
         previewHovered = false
         previewPanel?.orderOut(nil)
         previewModel.target = nil
+    }
+
+    // MARK: Calendar
+
+    private let calendarModel = CalendarModel()
+    private var calendarPanel: TaskbarPanel?
+    private var calendarClock = NSRect.zero
+    private var clickMonitors: [Any] = []
+
+    private func toggleCalendar(below clock: NSRect) {
+        if calendarPanel?.isVisible == true { return hideCalendar() }
+        hidePreviewNow()
+        let panel = calendarPanel ?? makeCalendarPanel()
+        calendarModel.openCount += 1
+        calendarClock = clock
+
+        // Size it to its content, then line its right edge up with the clock, just above the bar.
+        guard let host = panel.contentView else { return }
+        host.layoutSubtreeIfNeeded()
+        let size = NSSize(width: CalendarPopup.width, height: ceil(host.fittingSize.height))
+        let screen = NSScreen.screens.first { $0.frame.intersects(clock) } ?? NSScreen.main ?? NSScreen.screens[0]
+        let x = min(max(clock.maxX - size.width + 6, screen.frame.minX + 8), screen.frame.maxX - size.width - 8)
+        let frame = NSRect(x: x, y: screen.frame.minY + barHeight + 10, width: size.width, height: size.height)
+        panel.setFrame(frame, display: true)
+        panel.orderFrontRegardless()
+        // SwiftUI may resize the window once its content lays out, and AppKit keeps the top edge fixed when
+        // that happens, which would push the bottom below the screen. Keep the bottom edge just above the bar.
+        let bottomLeft = frame.origin
+        for delay in [0.0, 0.05, 0.2] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak panel] in
+                guard let panel, panel.isVisible, panel.frame.origin != bottomLeft else { return }
+                panel.setFrameOrigin(bottomLeft)
+            }
+        }
+
+        // Any click outside the calendar closes it (the clock itself toggles it instead).
+        let outside: (NSPoint) -> Bool = { [weak self] point in
+            guard let self, let panel = self.calendarPanel else { return false }
+            return !panel.frame.contains(point) && !self.calendarClock.contains(point)
+        }
+        clickMonitors.append(NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor in self?.hideCalendar() }
+        } as Any)
+        clickMonitors.append(NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] event in
+            if outside(NSEvent.mouseLocation) { Task { @MainActor in self?.hideCalendar() } }
+            return event
+        } as Any)
+    }
+
+    #if DEBUG
+    /// Debug only (--calendar): opens the calendar as if the clock at the bottom-right was clicked.
+    func showCalendarForTesting() {
+        guard let f = NSScreen.screens.first?.frame else { return }
+        toggleCalendar(below: NSRect(x: f.maxX - 120, y: f.minY + 4, width: 100, height: 40))
+    }
+    #endif
+
+    func hideCalendar() {
+        clickMonitors.forEach { NSEvent.removeMonitor($0) }
+        clickMonitors = []
+        calendarPanel?.orderOut(nil)
+    }
+
+    private func makeCalendarPanel() -> TaskbarPanel {
+        let panel = TaskbarPanel(frame: .zero)
+        panel.level = .popUpMenu
+        panel.hasShadow = true
+        let view = CalendarPopup()
+            .environmentObject(prefs)
+            .environmentObject(calendarModel)
+        panel.contentView = FirstClickHostingView(rootView: view)
+        calendarPanel = panel
+        return panel
     }
 
     private func makePreviewPanel() -> TaskbarPanel {

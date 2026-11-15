@@ -71,6 +71,18 @@ enum TaskbarButtons: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum CalendarStyle: String, Codable, CaseIterable, Identifiable {
+    case glass, windows, compact
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .glass: return "Mac2Seven glass"
+        case .windows: return "Windows 11"
+        case .compact: return "Compact"
+        }
+    }
+}
+
 struct TaskbarSettings: Codable, Equatable {
     var enabled = false
     var alignment: TaskbarAlignment = .center
@@ -79,6 +91,8 @@ struct TaskbarSettings: Codable, Equatable {
     var allDisplays = true
     var keepWindowsClear = true
     var showPreviews = true
+    var hideWindowless = false
+    var calendarStyle: CalendarStyle = .glass
     var pinned: [String] = TaskbarSettings.defaultPins()
 
     init() {}
@@ -93,6 +107,8 @@ struct TaskbarSettings: Codable, Equatable {
         allDisplays = (try? c.decodeIfPresent(Bool.self, forKey: .allDisplays)) ?? d.allDisplays
         keepWindowsClear = (try? c.decodeIfPresent(Bool.self, forKey: .keepWindowsClear)) ?? d.keepWindowsClear
         showPreviews = (try? c.decodeIfPresent(Bool.self, forKey: .showPreviews)) ?? d.showPreviews
+        hideWindowless = (try? c.decodeIfPresent(Bool.self, forKey: .hideWindowless)) ?? d.hideWindowless
+        calendarStyle = (try? c.decodeIfPresent(CalendarStyle.self, forKey: .calendarStyle)) ?? d.calendarStyle
         pinned = (try? c.decodeIfPresent([String].self, forKey: .pinned)) ?? d.pinned
     }
 
