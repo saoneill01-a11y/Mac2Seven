@@ -64,6 +64,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.showRecoveryNoticeIfNeeded() }
 
         #if DEBUG
+        // Debug only: --demo --taskbar stages the taskbar with the Start menu and calendar open.
+        if DemoMode.isOn, CommandLine.arguments.contains("--taskbar") {
+            showDemoBackdrop()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                self.taskbar.stageDemo()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.panel.makeFirstResponder(nil) }
+            }
+            return
+        }
         // Debug only: --demo [--all] stages the menu for marketing screenshots.
         if DemoMode.isOn {
             showDemoBackdrop()

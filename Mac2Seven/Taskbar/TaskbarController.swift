@@ -8,7 +8,8 @@ final class TaskbarPanel: NSPanel {
     init(frame: NSRect) {
         super.init(contentRect: frame, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         isFloatingPanel = true
-        level = .statusBar
+        // In demo mode it sits above the screenshot backdrop (which covers the real desktop).
+        level = DemoMode.isOn ? .popUpMenu : .statusBar
         backgroundColor = .clear
         isOpaque = false
         hasShadow = false
@@ -375,6 +376,14 @@ final class TaskbarController {
     }
 
     #if DEBUG
+    /// Debug only (--demo --taskbar): opens the Start menu and the calendar from their real buttons.
+    func stageDemo() {
+        if let start = hoverZones["start"]?.rect { onStart(start) }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            if let clock = self?.hoverZones["clock"]?.rect { self?.toggleCalendar(below: clock) }
+        }
+    }
+
     /// Debug only (--calendar): opens the calendar as if the clock at the bottom-right was clicked.
     func showCalendarForTesting() {
         guard let f = NSScreen.screens.first?.frame else { return }

@@ -84,6 +84,14 @@ final class WindowTracker: ObservableObject {
     // MARK: Polling
 
     func refresh() {
+        #if DEBUG
+        if DemoMode.isOn {
+            // Screenshots show a made-up set of Apple apps and windows, never what's really open.
+            if apps.isEmpty { (apps, activeWindow) = Self.demoApps() }
+            hasAccessibility = true
+            return
+        }
+        #endif
         guard !polling else { return }
         polling = true
         hasAccessibility = AXIsProcessTrusted()
@@ -181,6 +189,31 @@ final class WindowTracker: ObservableObject {
         let next = pinned.map(entry) + runningOrder.map(entry)
         if next != apps { apps = next }
     }
+
+    #if DEBUG
+    private static func demoApps() -> ([TaskApp], CGWindowID?) {
+        var nextID: CGWindowID = 1
+        func app(_ path: String, _ name: String, pinned: Bool, front: Bool = false, _ titles: [String]) -> TaskApp {
+            let windows = titles.map { title -> TaskWindow in
+                defer { nextID += 1 }
+                return TaskWindow(id: nextID, pid: 0, title: title, minimized: false)
+            }
+            return TaskApp(path: path, name: name, pid: titles.isEmpty && !front ? (pinned ? nil : 0) : 0,
+                           windows: windows, pinned: pinned, isFrontmost: front, isHidden: false)
+        }
+        let apps = [
+            app("/System/Library/CoreServices/Finder.app", "Finder", pinned: true, ["Documents", "Downloads"]),
+            app("/Applications/Safari.app", "Safari", pinned: true, front: true, ["Start Page", "Travel ideas"]),
+            app("/System/Applications/Mail.app", "Mail", pinned: true, ["Inbox"]),
+            app("/System/Applications/Calendar.app", "Calendar", pinned: true, []),
+            app("/System/Applications/Messages.app", "Messages", pinned: true, []),
+            app("/System/Applications/Music.app", "Music", pinned: true, ["Listen Now"]),
+            app("/System/Applications/Notes.app", "Notes", pinned: false, ["Shopping list"]),
+            app("/System/Applications/Photos.app", "Photos", pinned: false, ["Library"]),
+        ]
+        return (apps, apps[1].windows.first?.id)
+    }
+    #endif
 
     // MARK: Actions
 
