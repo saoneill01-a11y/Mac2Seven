@@ -32,6 +32,7 @@ final class MenuState: ObservableObject {
     func close() { closeHandler() }
 
     func setHover(_ id: String, _ inside: Bool) {
+        guard !DemoMode.isOn else { return } // screenshots stay unhighlighted
         if inside {
             guard !isDragging, hoveredID != id else { return }
             hoveredID = id

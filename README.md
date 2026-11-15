@@ -2,6 +2,12 @@
 
 A menu bar app launcher with a classic two-column Start-menu layout.
 
+<p align="center">
+  <img src="Marketing/mac2seven-menu-light.png" alt="The Mac2Seven menu: search, pinned and frequently used apps on the left, places and a Shut down button on the right" width="440">
+</p>
+
+**[Download Mac2Seven](https://github.com/saoneill01-a11y/Mac2Seven/releases/latest/download/Mac2Seven.zip)** · macOS 14 or later · signed and notarized
+
 ## Use
 - **Open:** click the menu bar icon, or press **⌥Space** anywhere.
 - **Pinned apps:** right-click any app → *Pin to Start Menu*, or drag an app (from the menu or Finder) onto the list. Drag pinned apps up or down to reorder them; a blue line shows where they'll land.
@@ -37,7 +43,7 @@ To sign it, select your team under the target's *Signing & Capabilities* tab (it
 
 The app icon is drawn by `Tools/make-icon.swift`; run `swift Tools/make-icon.swift` from the repo root to regenerate it.
 
-Debug-build launch flags (not in Release builds): `--open`, `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`.
+Debug-build launch flags (not in Release builds): `--open`, `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`, and `--demo [--all]`, which stages the menu with sample content for screenshots like the ones in `Marketing/`.
 
 ## Releasing a new version
 1. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml` (the build number must always go up).

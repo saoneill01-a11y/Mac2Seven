@@ -158,6 +158,10 @@ struct UserPicture: View {
             Group {
                 if let path = state.hoverIconPath {
                     Image(nsImage: IconCache.icon(path)).resizable().padding(4)
+                } else if DemoMode.isOn {
+                    #if DEBUG
+                    DemoAvatar()
+                    #endif
                 } else if let image = Self.userImage {
                     Image(nsImage: image).resizable()
                 } else {
@@ -196,6 +200,7 @@ struct PlaceRow: View {
             )
             .contentShape(Rectangle())
             .onHover { inside in
+                guard !DemoMode.isOn else { return }
                 hover = inside
                 state.hoverIconPath = inside ? place.path : nil
             }

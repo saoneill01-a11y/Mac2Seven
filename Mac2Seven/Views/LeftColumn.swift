@@ -108,6 +108,7 @@ struct LeftColumn: View {
     }
 
     private func focusSearch() {
+        guard !DemoMode.isOn else { return } // no blinking cursor in screenshots
         DispatchQueue.main.async { searchFocused = true }
     }
 

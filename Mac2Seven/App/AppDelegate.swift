@@ -62,6 +62,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.showRecoveryNoticeIfNeeded() }
 
         #if DEBUG
+        // Debug only: --demo [--all] stages the menu for marketing screenshots.
+        if DemoMode.isOn {
+            showDemoBackdrop()
+            let all = CommandLine.arguments.contains("--all")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                self.openPanel()
+                self.menuState.showingAll = all
+                // Centered on screen, away from the menu bar.
+                if let screen = NSScreen.main {
+                    let f = screen.frame
+                    self.panel.setFrameOrigin(NSPoint(x: f.midX - Self.panelSize.width / 2,
+                                                      y: f.midY - Self.panelSize.height / 2))
+                }
+                // No text cursor in the search box.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.panel.makeFirstResponder(nil) }
+            }
+            return
+        }
         // Debug only: --settings [tab]
         if let i = CommandLine.arguments.firstIndex(of: "--settings") {
             let args = CommandLine.arguments
@@ -82,6 +100,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         #endif
     }
+
+    #if DEBUG
+    private var demoBackdrop: NSWindow?
+
+    private func showDemoBackdrop() {
+        guard let screen = NSScreen.main else { return }
+        let window = NSWindow(contentRect: screen.frame, styleMask: .borderless, backing: .buffered, defer: false)
+        window.level = NSWindow.Level(rawValue: NSWindow.Level.popUpMenu.rawValue - 1)
+        window.ignoresMouseEvents = true
+        window.collectionBehavior = [.canJoinAllSpaces, .stationary]
+        window.contentView = NSHostingView(rootView: DemoBackdrop())
+        window.setFrame(screen.frame, display: true)
+        window.orderFrontRegardless()
+        demoBackdrop = window
+    }
+    #endif
 
     /// If a data file couldn't be read, it was renamed rather than overwritten; say so once.
     private func showRecoveryNoticeIfNeeded() {

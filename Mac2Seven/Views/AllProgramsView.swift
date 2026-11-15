@@ -59,6 +59,10 @@ struct AllProgramsView: View {
                 .padding(6)
                 .background(ScrollViewHook(scroller: state.autoScroller))
             }
+            .onAppear {
+                // Demo screenshots show the first folder open.
+                if DemoMode.isOn, let first = library.data.folders.first { expanded.insert(first.id) }
+            }
             // Dropping onto empty space takes an app (or folder) back out to the top level.
             .itemDrop(isTargeted: $topDropTarget, state: state) { paths in
                 library.move(paths, to: nil)

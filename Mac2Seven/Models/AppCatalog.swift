@@ -40,7 +40,8 @@ final class AppCatalog: ObservableObject {
     nonisolated static func scan() -> [AppItem] {
         let fm = FileManager.default
         let home = fm.homeDirectoryForCurrentUser.path
-        let roots = ["/Applications", "/System/Applications", home + "/Applications"]
+        // Demo screenshots only show Apple's built-in apps.
+        let roots = DemoMode.isOn ? ["/System/Applications"] : ["/Applications", "/System/Applications", home + "/Applications"]
         let ownPath = Bundle.main.bundlePath
         var result: [String: AppItem] = [:]
 
