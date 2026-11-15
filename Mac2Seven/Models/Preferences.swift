@@ -119,17 +119,28 @@ final class Preferences: ObservableObject {
             .appendingPathComponent("Mac2Seven", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         fileURL = dir.appendingPathComponent("settings.json")
-        if let raw = try? Data(contentsOf: fileURL),
-           let decoded = try? JSONDecoder().decode(PrefsData.self, from: raw) {
-            data = decoded
+        if FileManager.default.fileExists(atPath: fileURL.path) {
+            if let raw = try? Data(contentsOf: fileURL),
+               let decoded = try? JSONDecoder().decode(PrefsData.self, from: raw) {
+                data = decoded
+            } else if let moved = SafeFile.setAside(fileURL) {
+                recoveredFile = moved
+            } else {
+                saveDisabled = true
+            }
         }
     }
+
+    /// Set when settings.json couldn't be read and was set aside under this name.
+    private(set) var recoveredFile: URL?
+    private var saveDisabled = false
 
     var accentColor: Color {
         data.useSystemAccent ? Color(nsColor: .controlAccentColor) : (Color(hex: data.accentHex) ?? .blue)
     }
 
     private func save() {
+        guard !saveDisabled else { return }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         if let raw = try? encoder.encode(data) {
@@ -223,5 +234,25 @@ extension Color {
         let c = NSColor(self).usingColorSpace(.sRGB) ?? .systemBlue
         return String(format: "#%02X%02X%02X",
                       Int(round(c.redComponent * 255)), Int(round(c.greenComponent * 255)), Int(round(c.blueComponent * 255)))
+    }
+}
+
+// MARK: Safe files
+
+enum SafeFile {
+    /// Renames an unreadable data file to "<name>.unreadable-<date>.json" so it isn't overwritten.
+    static func setAside(_ url: URL) -> URL? {
+        let stamp = DateFormatter()
+        stamp.dateFormat = "yyyyMMdd-HHmmss"
+        let base = url.deletingPathExtension().lastPathComponent
+        let target = url.deletingLastPathComponent()
+            .appendingPathComponent("\(base).unreadable-\(stamp.string(from: Date())).json")
+        do {
+            try FileManager.default.moveItem(at: url, to: target)
+            return target
+        } catch {
+            NSLog("Mac2Seven couldn't set aside \(url.path): \(error)")
+            return nil
+        }
     }
 }

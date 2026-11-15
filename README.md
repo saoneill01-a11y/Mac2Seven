@@ -15,6 +15,10 @@ A menu bar app launcher with a classic two-column Start-menu layout.
   - *Places:* edit the right-hand column (add folders or apps, separators, rename, reorder), and switch Documents/Pictures/Desktop to your OneDrive folders in one click.
   - *Organize:* suggests folders by developer (Microsoft, Autodesk…) and creates them in one click; after that, new apps from those developers file themselves. Also controls auto-hiding of helpers and lists hidden apps.
   - *History:* how many frequently used apps to show, and Clear History.
+  - *Backup:* export your layout (pins, folders, hidden apps, places, appearance) to a file — e.g. in OneDrive — and import it later or on another Mac. Importing saves your current layout to the data folder first.
+- **About Mac2Seven** is in the menu bar icon's right-click menu.
+- **More than one display?** The menu opens on the screen your mouse is on.
+- **Data safety:** if a saved file ever can't be read, Mac2Seven renames it (`*.unreadable-<date>.json`) instead of overwriting it, and tells you.
 - **Hide apps:** right-click → *Hide*. Helpers, installers and uninstallers (names with Helper, Service, Agent, Uninstaller…, or starting with Remove) are hidden automatically unless you've pinned or filed them. Hidden apps live in a *Hidden* folder at the bottom of All Programs and still show up in search.
 - **New apps** get a *New* badge for a week (or until you open them), and All Programs shows the badge when something new is waiting.
 
@@ -30,4 +34,6 @@ open Mac2Seven.xcodeproj
 
 To sign it, select your team under the target's *Signing & Capabilities* tab (it is ad-hoc signed by default).
 
-Debug launch flags: `--open`, `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`.
+The app icon is drawn by `Tools/make-icon.swift`; run `swift Tools/make-icon.swift` from the repo root to regenerate it.
+
+Debug-build launch flags (not in Release builds): `--open`, `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`.

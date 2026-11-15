@@ -23,6 +23,9 @@ struct SettingsView: View {
             HistorySettings()
                 .tabItem { Label("History", systemImage: "clock") }
                 .tag("history")
+            BackupSettings()
+                .tabItem { Label("Backup", systemImage: "externaldrive") }
+                .tag("backup")
         }
         .frame(width: 580, height: 600)
     }
@@ -465,6 +468,51 @@ struct OrganizeSettings: View {
     private func refresh() {
         suggestions = library.suggestions(from: catalog.apps, autoHide: prefs.data.autoHideHelpers)
         chosen = Set(suggestions.map(\.id))
+    }
+}
+
+// MARK: Backup
+
+struct BackupSettings: View {
+    @EnvironmentObject var prefs: Preferences
+    @EnvironmentObject var library: Library
+    @State private var message: String?
+
+    var body: some View {
+        Form {
+            Section {
+                LabeledContent("Export layout") {
+                    Button("Export…") { message = Backup.export(library: library, prefs: prefs) ?? message }
+                }
+            } footer: {
+                Text("Saves your pinned apps, folders, hidden apps, places and appearance to a file. Keep it in OneDrive as a backup, or import it on another Mac.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Import layout") {
+                    Button("Import…") { message = Backup.importLayout(library: library, prefs: prefs) ?? message }
+                }
+            } footer: {
+                Text("Replaces your current layout. It's saved to the data folder first, and launch history on this Mac is kept.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
+                LabeledContent("Data folder") {
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([library.fileURL])
+                    }
+                }
+            }
+
+            if let message {
+                Section {
+                    Text(message).font(.callout)
+                }
+            }
+        }
+        .formStyle(.grouped)
     }
 }
 

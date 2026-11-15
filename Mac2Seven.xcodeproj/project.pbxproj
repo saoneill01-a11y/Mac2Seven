@@ -10,10 +10,12 @@
 		000E30DAD35FD09A61D3EE15 /* LeftColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42CC5BE6A569B3CA01C33C2C /* LeftColumn.swift */; };
 		3651CFF1484ACF89FE626647 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87F46FFAF127D98C0EAB6A3 /* Preferences.swift */; };
 		4200B9A2E5A8968DD2F1AAA7 /* SearchAndRightColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = D364158F6DC338730D0FF830 /* SearchAndRightColumn.swift */; };
+		431F67D4699102778BFFC49C /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32815DEA3C3856C2B8A5986 /* Backup.swift */; };
 		6242C5A412A5279583A0CD86 /* AppCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F3BF12325DFF4ACD1BAF880 /* AppCatalog.swift */; };
 		7530BF57B18657E104B826D1 /* StartMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653F4C4BAAA8592540565A82 /* StartMenuView.swift */; };
 		7C352E8D80CC4B40FBFDC30F /* AllProgramsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6316497295C014241E62D7C3 /* AllProgramsView.swift */; };
 		9A2E41F551B469A0AB71EDC6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F718B9001D0F45E55C38F075 /* AppDelegate.swift */; };
+		ADAD85BC64204D246FEA5BA2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6CC1C066F36CD7D402CA5EA5 /* Assets.xcassets */; };
 		B1E5D9B97B7BA9AE6BEAED88 /* SystemSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FEC946AD0BB9DDCB287A3B3 /* SystemSupport.swift */; };
 		B5CCA38948AA09FB0EB6CD4D /* DragDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5843BBF1BACD22BC2BE50A85 /* DragDrop.swift */; };
 		C19D0C9B3A2CAD1E5C5E4899 /* AutoScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59832C26A5B28BB9BF7CA6B /* AutoScroll.swift */; };
@@ -32,12 +34,14 @@
 		5843BBF1BACD22BC2BE50A85 /* DragDrop.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DragDrop.swift; sourceTree = "<group>"; };
 		6316497295C014241E62D7C3 /* AllProgramsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AllProgramsView.swift; sourceTree = "<group>"; };
 		653F4C4BAAA8592540565A82 /* StartMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartMenuView.swift; sourceTree = "<group>"; };
+		6CC1C066F36CD7D402CA5EA5 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		92F0289B8281C70164926919 /* Mac2Seven.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mac2Seven.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FEC946AD0BB9DDCB287A3B3 /* SystemSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSupport.swift; sourceTree = "<group>"; };
 		C3FE17F28C79981EE745CC10 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C59832C26A5B28BB9BF7CA6B /* AutoScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScroll.swift; sourceTree = "<group>"; };
 		C87F46FFAF127D98C0EAB6A3 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		D364158F6DC338730D0FF830 /* SearchAndRightColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchAndRightColumn.swift; sourceTree = "<group>"; };
+		F32815DEA3C3856C2B8A5986 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		F718B9001D0F45E55C38F075 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -60,6 +64,7 @@
 			isa = PBXGroup;
 			children = (
 				4F3BF12325DFF4ACD1BAF880 /* AppCatalog.swift */,
+				F32815DEA3C3856C2B8A5986 /* Backup.swift */,
 				4BB724A2AC69DFFA0B1AAC60 /* Library.swift */,
 				C87F46FFAF127D98C0EAB6A3 /* Preferences.swift */,
 				42E89C51B8DC0E6F03BCF288 /* Search.swift */,
@@ -94,6 +99,7 @@
 		A6FA30EFD049042BA2AE3BFF /* Mac2Seven */ = {
 			isa = PBXGroup;
 			children = (
+				6CC1C066F36CD7D402CA5EA5 /* Assets.xcassets */,
 				C3FE17F28C79981EE745CC10 /* Info.plist */,
 				06A9C6B37692DF37A3BC41FC /* Mac2Seven.entitlements */,
 				5E4482498FDBEC78DC6EFE9F /* App */,
@@ -120,6 +126,7 @@
 			buildConfigurationList = CEA594E8D4CB6BE0721CEA2E /* Build configuration list for PBXNativeTarget "Mac2Seven" */;
 			buildPhases = (
 				BAE632DC6AC3842383A823A0 /* Sources */,
+				7748186D64727FDB55316734 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -165,6 +172,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		7748186D64727FDB55316734 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ADAD85BC64204D246FEA5BA2 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		BAE632DC6AC3842383A823A0 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -174,6 +192,7 @@
 				6242C5A412A5279583A0CD86 /* AppCatalog.swift in Sources */,
 				9A2E41F551B469A0AB71EDC6 /* AppDelegate.swift in Sources */,
 				C19D0C9B3A2CAD1E5C5E4899 /* AutoScroll.swift in Sources */,
+				431F67D4699102778BFFC49C /* Backup.swift in Sources */,
 				B5CCA38948AA09FB0EB6CD4D /* DragDrop.swift in Sources */,
 				000E30DAD35FD09A61D3EE15 /* LeftColumn.swift in Sources */,
 				DB8CE3AA2C842399F92C18D5 /* Library.swift in Sources */,
@@ -274,7 +293,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -338,7 +357,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

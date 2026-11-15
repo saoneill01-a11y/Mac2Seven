@@ -74,16 +74,33 @@ final class Library: ObservableObject {
 
     // MARK: Persistence
 
+    /// Set when library.json couldn't be read and was set aside under this name (shown to the user once).
+    private(set) var recoveredFile: URL?
+    /// Never overwrite a file we couldn't read and couldn't move out of the way.
+    private var saveDisabled = false
+
     func load() {
+        let fm = FileManager.default
+        guard fm.fileExists(atPath: fileURL.path) else {
+            data = Self.seed() // first run
+            return
+        }
         if let raw = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode(LibraryData.self, from: raw) {
             data = decoded
-        } else {
-            data = Self.seed()
+            return
         }
+        // Unreadable: keep it for recovery instead of overwriting it with a fresh layout.
+        if let moved = SafeFile.setAside(fileURL) {
+            recoveredFile = moved
+        } else {
+            saveDisabled = true
+        }
+        data = Self.seed()
     }
 
     private func scheduleSave() {
+        guard !saveDisabled else { return }
         saveWork?.cancel()
         let snapshot = data
         let url = fileURL

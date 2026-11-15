@@ -58,8 +58,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &cancellables)
         installKeyMonitor()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.showRecoveryNoticeIfNeeded() }
 
-        // Debug: --settings [tab]
+        #if DEBUG
+        // Debug only: --settings [tab]
         if let i = CommandLine.arguments.firstIndex(of: "--settings") {
             let args = CommandLine.arguments
             let tab = i + 1 < args.count && !args[i + 1].hasPrefix("--") ? args[i + 1] : "general"
@@ -76,6 +78,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     self.menuState.showingAll = true
                 }
             }
+        }
+        #endif
+    }
+
+    /// If a data file couldn't be read, it was renamed rather than overwritten; say so once.
+    private func showRecoveryNoticeIfNeeded() {
+        let files = [library.recoveredFile, prefs.recoveredFile].compactMap { $0 }
+        guard !files.isEmpty else { return }
+        let alert = NSAlert()
+        alert.messageText = "Mac2Seven couldn't read part of its saved data"
+        alert.informativeText = """
+            To keep it safe, the unreadable file was renamed instead of being overwritten, and Mac2Seven \
+            started with defaults:
+
+            \(files.map(\.lastPathComponent).joined(separator: "\n"))
+
+            You can restore a layout you exported with Settings → Backup → Import.
+            """
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Show File")
+        NSApp.activate()
+        if alert.runModal() == .alertSecondButtonReturn {
+            NSWorkspace.shared.activateFileViewerSelecting(files)
         }
     }
 
@@ -114,6 +139,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let reveal = NSMenuItem(title: "Show Data Folder", action: #selector(revealLibrary), keyEquivalent: "")
         reveal.target = self
         menu.addItem(reveal)
+        let about = NSMenuItem(title: "About Mac2Seven", action: #selector(showAbout), keyEquivalent: "")
+        about.target = self
+        menu.addItem(about)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Mac2Seven", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
@@ -123,6 +151,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openFromMenu() { openPanel() }
+
+    @objc private func showAbout() {
+        let link = "https://github.com/saoneill01-a11y/Mac2Seven"
+        let credits = NSMutableAttributedString(
+            string: "A classic two-column start menu for your Mac.\n",
+            attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: NSColor.secondaryLabelColor])
+        credits.append(NSAttributedString(string: "github.com/saoneill01-a11y/Mac2Seven",
+                                          attributes: [.font: NSFont.systemFont(ofSize: 11), .link: link]))
+        let centered = NSMutableParagraphStyle()
+        centered.alignment = .center
+        credits.addAttribute(.paragraphStyle, value: centered, range: NSRange(location: 0, length: credits.length))
+        NSApp.activate()
+        NSApp.orderFrontStandardAboutPanel(options: [.credits: credits])
+    }
 
     @objc private func revealLibrary() {
         // The folder holding library.json (pins, folders, history) and settings.json.
@@ -192,16 +234,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         lastClose = Date()
     }
 
+    /// Opens under the menu bar icon on the screen the mouse is on. On other displays it sits the same
+    /// distance from the right edge as the icon does on its own screen.
     private func panelOrigin() -> NSPoint {
         let size = Self.panelSize
-        if let button = statusItem.button, let window = button.window, let screen = window.screen {
+        let mouse = NSEvent.mouseLocation
+        let target = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
+        let visible = target.visibleFrame
+
+        if let button = statusItem.button, let window = button.window, let iconScreen = window.screen {
             let rect = window.convertToScreen(button.convert(button.bounds, to: nil))
-            let visible = screen.visibleFrame
-            let x = min(max(rect.minX, visible.minX + 8), visible.maxX - size.width - 8)
-            return NSPoint(x: x, y: rect.minY - size.height - 6)
+            let x: CGFloat
+            let y: CGFloat
+            if iconScreen == target {
+                x = rect.minX
+                y = rect.minY - size.height - 6
+            } else {
+                x = visible.maxX - (iconScreen.frame.maxX - rect.minX)
+                y = visible.maxY - size.height - 6
+            }
+            return NSPoint(x: min(max(x, visible.minX + 8), visible.maxX - size.width - 8), y: y)
         }
-        let screen = NSScreen.main ?? NSScreen.screens[0]
-        let visible = screen.visibleFrame
         return NSPoint(x: visible.midX - size.width / 2, y: visible.maxY - size.height - 6)
     }
 
