@@ -6,7 +6,7 @@ struct TaskbarSettingsView: View {
     @EnvironmentObject var prefs: Preferences
     @EnvironmentObject var tracker: WindowTracker
     @EnvironmentObject var thumbnails: Thumbnails
-    @State private var dockHidden = Dock.isAutoHidden
+    @State private var dockAway = Dock.isKeptAway
     @State private var dockError: String?
 
     private var settings: Binding<TaskbarSettings> { $prefs.data.taskbar }
@@ -31,21 +31,34 @@ struct TaskbarSettingsView: View {
                     ForEach(TaskbarButtons.allCases) { Text($0.title).tag($0) }
                 }
                 Toggle("Show on all displays", isOn: settings.allDisplays)
+                Picker("Clock calendar", selection: settings.calendarStyle) {
+                    ForEach(CalendarStyle.allCases) { Text($0.title).tag($0) }
+                }
+            }
+
+            Section {
+                Toggle("Hide apps with no open windows", isOn: settings.hideWindowless)
+            } footer: {
+                Text("Mac apps keep running after you close their last window. With this on, they leave the taskbar until you open a window again (pinned apps stay). An app whose only window is on another desktop is hidden too, because its window can't be seen from here.")
+                    .font(.caption).foregroundStyle(.secondary)
             }
 
             Section {
                 Toggle("Show window previews on hover", isOn: settings.showPreviews)
                 Toggle("Keep windows clear of the taskbar", isOn: settings.keepWindowsClear)
                 LabeledContent("Mac Dock") {
-                    if dockHidden {
-                        Text("Hidden automatically").foregroundStyle(.secondary)
+                    if dockAway {
+                        HStack {
+                            Text("Hidden").foregroundStyle(.secondary)
+                            Button("Show the Dock Again") { setDockAway(false) }
+                        }
                     } else {
-                        Button("Hide the Dock") { hideDock() }
+                        Button("Hide the Dock") { setDockAway(true) }
                     }
                 }
                 if let dockError { Text(dockError).font(.caption).foregroundStyle(.red) }
             } footer: {
-                Text("Windows that reach behind the taskbar are made shorter. Hiding the Dock keeps it from covering the taskbar; it still appears when you move the pointer to the bottom edge.")
+                Text("Windows that reach behind the taskbar are made shorter. Hiding the Dock keeps it from popping up over the taskbar when the pointer reaches the bottom of the screen. Switch apps with the taskbar or ⌘Tab instead.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -86,14 +99,14 @@ struct TaskbarSettingsView: View {
         }
         .formStyle(.grouped)
         .onAppear {
-            dockHidden = Dock.isAutoHidden
+            dockAway = Dock.isKeptAway
             thumbnails.checkPermission()
             tracker.refresh()
         }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) { _ in
             thumbnails.checkPermission()
             tracker.refresh()
-            dockHidden = Dock.isAutoHidden
+            dockAway = Dock.isKeptAway
         }
     }
 
@@ -115,12 +128,12 @@ struct TaskbarSettingsView: View {
         }
     }
 
-    private func hideDock() {
-        if Dock.setAutoHide(true) {
+    private func setDockAway(_ away: Bool) {
+        if Dock.setKeptAway(away) {
             dockError = nil
-            dockHidden = true
+            dockAway = away
         } else {
-            dockError = "Couldn't change the Dock. Turn on “Automatically hide and show the Dock” in System Settings → Desktop & Dock."
+            dockError = "Couldn't change the Dock settings."
         }
     }
 }
@@ -151,16 +164,50 @@ private struct PermissionRow: View {
     }
 }
 
+/// Keeps the Mac Dock out of the way of the taskbar by turning on auto-hide with a very long delay, so it
+/// never pops up at the bottom edge. Showing it again puts back the user's own auto-hide setting.
 enum Dock {
-    static var isAutoHidden: Bool {
-        UserDefaults(suiteName: "com.apple.dock")?.bool(forKey: "autohide") ?? false
+    private static let domain = "com.apple.dock" as CFString
+    private static let longDelay: Double = 1000
+    /// Remembers whether auto-hide was already on before Mac2Seven hid the Dock.
+    private static let autohideWasOnKey = "dockAutohideWasOn"
+
+    private static func value(_ key: String) -> Any? {
+        CFPreferencesAppSynchronize(domain)
+        return CFPreferencesCopyAppValue(key as CFString, domain)
     }
 
-    /// Uses System Events (the same permission Mac2Seven already asks for to shut down or restart).
-    static func setAutoHide(_ on: Bool) -> Bool {
-        var error: NSDictionary?
-        NSAppleScript(source: "tell application \"System Events\" to set autohide of dock preferences to \(on)")?
-            .executeAndReturnError(&error)
-        return error == nil
+    static var isKeptAway: Bool {
+        ((value("autohide-delay") as? NSNumber)?.doubleValue ?? 0) >= 100 && (value("autohide") as? Bool ?? false)
+    }
+
+    @discardableResult
+    static func setKeptAway(_ away: Bool) -> Bool {
+        var ok: Bool
+        if away {
+            UserDefaults.standard.set(value("autohide") as? Bool ?? false, forKey: autohideWasOnKey)
+            ok = run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide", "-bool", "true"])
+            ok = ok && run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide-delay", "-float", String(longDelay)])
+        } else {
+            // Deleting a key that isn't there fails harmlessly, so its result isn't checked.
+            run("/usr/bin/defaults", ["delete", "com.apple.dock", "autohide-delay"])
+            let wasOn = UserDefaults.standard.bool(forKey: autohideWasOnKey)
+            ok = run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide", "-bool", wasOn ? "true" : "false"])
+        }
+        // The Dock reads its settings when it starts; it restarts on its own right away.
+        run("/usr/bin/killall", ["Dock"])
+        return ok
+    }
+
+    @discardableResult
+    private static func run(_ tool: String, _ args: [String]) -> Bool {
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: tool)
+        p.arguments = args
+        p.standardOutput = FileHandle.nullDevice
+        p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return false }
+        p.waitUntilExit()
+        return p.terminationStatus == 0
     }
 }

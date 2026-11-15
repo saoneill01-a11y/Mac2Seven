@@ -26,6 +26,7 @@
 		B5CCA38948AA09FB0EB6CD4D /* DragDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5843BBF1BACD22BC2BE50A85 /* DragDrop.swift */; };
 		C19D0C9B3A2CAD1E5C5E4899 /* AutoScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59832C26A5B28BB9BF7CA6B /* AutoScroll.swift */; };
 		C4C542B8C22FE43502002435 /* Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E89C51B8DC0E6F03BCF288 /* Search.swift */; };
+		D3078994B154881F0AD6A952 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30087B3ECB6A06F8278BFB9 /* CalendarView.swift */; };
 		D62626520B93CB0ECFA861F6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 048179323729F6280BE3BFEB /* SettingsView.swift */; };
 		DB8CE3AA2C842399F92C18D5 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BB724A2AC69DFFA0B1AAC60 /* Library.swift */; };
 		F3D131D436BF613866B71133 /* WindowTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5C84DFCD7D10937F4CB9071 /* WindowTracker.swift */; };
@@ -55,6 +56,7 @@
 		C8C11D5C63395BB9E30684FB /* Thumbnails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Thumbnails.swift; sourceTree = "<group>"; };
 		D364158F6DC338730D0FF830 /* SearchAndRightColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchAndRightColumn.swift; sourceTree = "<group>"; };
 		E0364743BBD73907B05F3FB3 /* TaskbarSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskbarSettingsView.swift; sourceTree = "<group>"; };
+		E30087B3ECB6A06F8278BFB9 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		E5C84DFCD7D10937F4CB9071 /* WindowTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTracker.swift; sourceTree = "<group>"; };
 		F32815DEA3C3856C2B8A5986 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		F718B9001D0F45E55C38F075 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -142,6 +144,7 @@
 		D5E001A45C58602CA855F490 /* Taskbar */ = {
 			isa = PBXGroup;
 			children = (
+				E30087B3ECB6A06F8278BFB9 /* CalendarView.swift */,
 				928AD9240009A93040424271 /* TaskbarController.swift */,
 				E0364743BBD73907B05F3FB3 /* TaskbarSettingsView.swift */,
 				3455BFF9A0D5444083083D0F /* TaskbarView.swift */,
@@ -236,6 +239,7 @@
 				9A2E41F551B469A0AB71EDC6 /* AppDelegate.swift in Sources */,
 				C19D0C9B3A2CAD1E5C5E4899 /* AutoScroll.swift in Sources */,
 				431F67D4699102778BFFC49C /* Backup.swift in Sources */,
+				D3078994B154881F0AD6A952 /* CalendarView.swift in Sources */,
 				94A260F911A73D6FE1CF8AE2 /* DemoMode.swift in Sources */,
 				B5CCA38948AA09FB0EB6CD4D /* DragDrop.swift in Sources */,
 				000E30DAD35FD09A61D3EE15 /* LeftColumn.swift in Sources */,

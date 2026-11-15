@@ -6,6 +6,8 @@ import SwiftUI
 final class MenuState: ObservableObject {
     @Published var query = ""
     @Published var showingAll = false
+    /// Opened from the taskbar's Start button: search and All Programs go at the bottom, Windows-style.
+    @Published var fromBottom = false
     @Published var selection = 0
     @Published var openToken = 0
     /// Path whose icon replaces the user picture while hovering (like the classic menu did).

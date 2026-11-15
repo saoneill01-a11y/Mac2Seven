@@ -20,11 +20,12 @@ struct LeftColumn: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            // It drops down from the menu bar, so search and All Programs sit at the top.
-            searchField
+            // Dropping down from the menu bar, search and All Programs sit at the top; rising from the
+            // taskbar's Start button, they sit at the bottom like the Windows menu.
+            if !state.fromBottom { searchField }
 
             VStack(spacing: 0) {
-                if state.query.isEmpty {
+                if state.query.isEmpty && !state.fromBottom {
                     allProgramsButton
                     Divider()
                 }
@@ -38,6 +39,10 @@ struct LeftColumn: View {
                     }
                 }
                 .frame(maxHeight: .infinity, alignment: .top)
+                if state.query.isEmpty && state.fromBottom {
+                    Divider()
+                    allProgramsButton
+                }
             }
             .background(
                 RoundedRectangle(cornerRadius: p.cardCorner, style: .continuous)
@@ -48,6 +53,8 @@ struct LeftColumn: View {
                 RoundedRectangle(cornerRadius: p.cardCorner, style: .continuous)
                     .strokeBorder(p.cardStroke, lineWidth: 1)
             )
+
+            if state.fromBottom { searchField }
         }
         .onChange(of: state.query) { _, q in
             state.selection = 0
@@ -104,7 +111,7 @@ struct LeftColumn: View {
                 .strokeBorder(p.searchStroke, lineWidth: 1)
         )
         .padding(.horizontal, 6)
-        .padding(.top, 2)
+        .padding(state.fromBottom ? .bottom : .top, 2)
     }
 
     private func focusSearch() {
