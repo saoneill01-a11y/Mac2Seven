@@ -2,9 +2,10 @@
 # Builds, signs, notarizes and (optionally) publishes a Mac2Seven release with a Sparkle update feed.
 #
 #   Tools/release.sh             Dry run: build, sign, notarize, staple and make dist/vX.Y/ — nothing is uploaded.
-#   Tools/release.sh --publish   The same, then create the GitHub release with the zip, disk image and appcast.xml.
+#   Tools/release.sh --publish   The same, then create the GitHub release with the disk image and appcast.xml.
 #
-# Mac2Seven.dmg is the website download; the zip is what Sparkle uses for automatic updates.
+# One signed, notarized disk image is used for both: Sparkle installs updates from Mac2Seven-X.Y.dmg, and
+# websites link to the same file under the fixed name Mac2Seven.dmg.
 #
 # Before a release: bump MARKETING_VERSION and CURRENT_PROJECT_VERSION in project.yml (the build number
 # must go up every time; Sparkle uses it to compare versions), write Tools/release-notes/vX.Y.md,
@@ -75,8 +76,9 @@ rm "$OUT/upload.zip"
 step "Stapling and checking Gatekeeper"
 xcrun stapler staple -q "$APP"
 spctl --assess --type execute "$APP"
-ZIP="$OUT/Mac2Seven-$VERSION.zip"
-ditto -c -k --keepParent "$APP" "$ZIP"
+step "Making the disk image"
+DMG="$OUT/Mac2Seven-$VERSION.dmg"
+Tools/make-dmg.sh "$APP" "$DMG"
 
 step "Writing the update feed (signed with your Sparkle key)"
 "$SPARKLE_BIN/generate_appcast" --account "$KEY_ACCOUNT" \
@@ -85,13 +87,10 @@ step "Writing the update feed (signed with your Sparkle key)"
     --link "https://github.com/$REPO" \
     -o "$OUT/appcast.xml" "$OUT"
 grep -q "sparkle:edSignature" "$OUT/appcast.xml" || fail "appcast.xml has no update signature"
-# Same zip under a fixed name, so websites can link to .../releases/latest/download/Mac2Seven.zip
-mkdir -p "$OUT/stable" && cp "$ZIP" "$OUT/stable/Mac2Seven.zip"
-shasum -a 256 "$ZIP"
-
-# Made after the feed, so the disk image isn't listed as an update. Websites link to .../latest/download/Mac2Seven.dmg
-step "Making the disk image for the website"
-Tools/make-dmg.sh "$APP" "$OUT/stable/Mac2Seven.dmg"
+grep -q "Mac2Seven-$VERSION.dmg" "$OUT/appcast.xml" || fail "appcast.xml doesn't point to the disk image"
+# Same disk image under a fixed name, so websites can link to .../releases/latest/download/Mac2Seven.dmg
+mkdir -p "$OUT/stable" && cp "$DMG" "$OUT/stable/Mac2Seven.dmg"
+shasum -a 256 "$DMG"
 
 if ! $PUBLISH; then
     step "Dry run finished: $OUT (run with --publish to release it)"
@@ -100,5 +99,5 @@ fi
 
 step "Publishing $TAG on GitHub"
 gh release create "$TAG" --repo "$REPO" --target main --title "Mac2Seven $VERSION" --notes-file "$NOTES" \
-    "$ZIP" "$OUT/stable/Mac2Seven.zip" "$OUT/stable/Mac2Seven.dmg" "$OUT/appcast.xml"
+    "$DMG" "$OUT/stable/Mac2Seven.dmg" "$OUT/appcast.xml"
 step "Published: https://github.com/$REPO/releases/tag/$TAG"
