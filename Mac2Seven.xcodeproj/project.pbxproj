@@ -13,6 +13,7 @@
 		431F67D4699102778BFFC49C /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32815DEA3C3856C2B8A5986 /* Backup.swift */; };
 		6242C5A412A5279583A0CD86 /* AppCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F3BF12325DFF4ACD1BAF880 /* AppCatalog.swift */; };
 		7530BF57B18657E104B826D1 /* StartMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653F4C4BAAA8592540565A82 /* StartMenuView.swift */; };
+		75C92CE765CB61CC4A6FF0B0 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 8B7850415F08BE281F8BD511 /* Sparkle */; };
 		7C352E8D80CC4B40FBFDC30F /* AllProgramsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6316497295C014241E62D7C3 /* AllProgramsView.swift */; };
 		9A2E41F551B469A0AB71EDC6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F718B9001D0F45E55C38F075 /* AppDelegate.swift */; };
 		ADAD85BC64204D246FEA5BA2 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6CC1C066F36CD7D402CA5EA5 /* Assets.xcassets */; };
@@ -22,11 +23,13 @@
 		C4C542B8C22FE43502002435 /* Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E89C51B8DC0E6F03BCF288 /* Search.swift */; };
 		D62626520B93CB0ECFA861F6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 048179323729F6280BE3BFEB /* SettingsView.swift */; };
 		DB8CE3AA2C842399F92C18D5 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BB724A2AC69DFFA0B1AAC60 /* Library.swift */; };
+		F7C0FC80408C1F3D0D1196A3 /* Updater.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2828B6F54B0E7353986822BF /* Updater.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		048179323729F6280BE3BFEB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		06A9C6B37692DF37A3BC41FC /* Mac2Seven.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mac2Seven.entitlements; sourceTree = "<group>"; };
+		2828B6F54B0E7353986822BF /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		42CC5BE6A569B3CA01C33C2C /* LeftColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LeftColumn.swift; sourceTree = "<group>"; };
 		42E89C51B8DC0E6F03BCF288 /* Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Search.swift; sourceTree = "<group>"; };
 		4BB724A2AC69DFFA0B1AAC60 /* Library.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Library.swift; sourceTree = "<group>"; };
@@ -44,6 +47,17 @@
 		F32815DEA3C3856C2B8A5986 /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
 		F718B9001D0F45E55C38F075 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		264CBCBB7B78F84B63172B76 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				75C92CE765CB61CC4A6FF0B0 /* Sparkle in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
 		1461D69A62A090B6EEE8243A /* Views */ = {
@@ -84,6 +98,7 @@
 			isa = PBXGroup;
 			children = (
 				9FEC946AD0BB9DDCB287A3B3 /* SystemSupport.swift */,
+				2828B6F54B0E7353986822BF /* Updater.swift */,
 			);
 			path = System;
 			sourceTree = "<group>";
@@ -127,6 +142,7 @@
 			buildPhases = (
 				BAE632DC6AC3842383A823A0 /* Sources */,
 				7748186D64727FDB55316734 /* Resources */,
+				264CBCBB7B78F84B63172B76 /* Frameworks */,
 			);
 			buildRules = (
 			);
@@ -134,6 +150,7 @@
 			);
 			name = Mac2Seven;
 			packageProductDependencies = (
+				8B7850415F08BE281F8BD511 /* Sparkle */,
 			);
 			productName = Mac2Seven;
 			productReference = 92F0289B8281C70164926919 /* Mac2Seven.app */;
@@ -159,6 +176,9 @@
 			);
 			mainGroup = 3EF229A309CD474C07181E72;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				D3B9B4B618683C93892966BD /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = E52E8189E8465AE9B93F2E66 /* Products */;
 			projectDirPath = "";
@@ -199,6 +219,7 @@
 				D62626520B93CB0ECFA861F6 /* SettingsView.swift in Sources */,
 				7530BF57B18657E104B826D1 /* StartMenuView.swift in Sources */,
 				B1E5D9B97B7BA9AE6BEAED88 /* SystemSupport.swift in Sources */,
+				F7C0FC80408C1F3D0D1196A3 /* Updater.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -280,7 +301,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -293,7 +314,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -338,7 +359,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -357,7 +378,7 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -391,6 +412,25 @@
 			defaultConfigurationName = Debug;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		D3B9B4B618683C93892966BD /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.6.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		8B7850415F08BE281F8BD511 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = D3B9B4B618683C93892966BD /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 0FC889F051BEACC75B2E3C23 /* Project object */;
 }

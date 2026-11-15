@@ -28,6 +28,14 @@
 	<string>Mac2Seven uses System Events to shut down, restart, or log out when you choose those options.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string></string>
+	<key>SUEnableAutomaticChecks</key>
+	<true/>
+	<key>SUFeedURL</key>
+	<string>https://github.com/saoneill01-a11y/Mac2Seven/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>QM9PlLRhLIePVFEAOTnD/RufUnFbaEh0HFgig022LKk=</string>
+	<key>SUScheduledCheckInterval</key>
+	<integer>86400</integer>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>

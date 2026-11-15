@@ -21,6 +21,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let menuState = MenuState()
     let fileSearch = FileSearch()
     let prefs = Preferences()
+    let updater = UpdaterModel()
 
     private var statusItem: NSStatusItem!
     private var panel: StartPanel!
@@ -142,6 +143,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let about = NSMenuItem(title: "About Mac2Seven", action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
+        let update = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+        update.target = self
+        menu.addItem(update)
         menu.addItem(.separator())
         menu.addItem(NSMenuItem(title: "Quit Mac2Seven", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
 
@@ -151,6 +155,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openFromMenu() { openPanel() }
+
+    @objc private func checkForUpdates() {
+        updater.checkForUpdates()
+    }
 
     @objc private func showAbout() {
         let link = "https://github.com/saoneill01-a11y/Mac2Seven"
@@ -185,6 +193,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 .environmentObject(prefs)
                 .environmentObject(library)
                 .environmentObject(catalog)
+                .environmentObject(updater)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Mac2Seven Settings"
             window.styleMask = [.titled, .closable, .miniaturizable]

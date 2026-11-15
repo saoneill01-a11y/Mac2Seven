@@ -35,6 +35,7 @@ struct SettingsView: View {
 
 struct GeneralSettings: View {
     @EnvironmentObject var prefs: Preferences
+    @EnvironmentObject var updater: UpdaterModel
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var loginError: String?
 
@@ -69,9 +70,27 @@ struct GeneralSettings: View {
                 Text("The main button does this; the arrow next to it lists the other options.")
                     .font(.caption).foregroundStyle(.secondary)
             }
+
+            Section {
+                Toggle("Check for updates automatically", isOn: $updater.automaticallyChecks)
+                LabeledContent("Version \(Self.version)") {
+                    Button("Check Now") { updater.checkForUpdates() }
+                }
+            } header: {
+                Text("Updates")
+            } footer: {
+                Text(updater.lastChecked.map { "Last checked \($0.formatted(date: .abbreviated, time: .shortened))." }
+                     ?? "Mac2Seven checks once a day and asks before installing anything.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
         .onAppear { launchAtLogin = SMAppService.mainApp.status == .enabled }
+    }
+
+    static var version: String {
+        let info = Bundle.main.infoDictionary
+        return "\(info?["CFBundleShortVersionString"] as? String ?? "?") (\(info?["CFBundleVersion"] as? String ?? "?"))"
     }
 
     private func setLaunchAtLogin(_ on: Bool) {

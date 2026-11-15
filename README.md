@@ -16,7 +16,8 @@ A menu bar app launcher with a classic two-column Start-menu layout.
   - *Organize:* suggests folders by developer (Microsoft, Autodesk…) and creates them in one click; after that, new apps from those developers file themselves. Also controls auto-hiding of helpers and lists hidden apps.
   - *History:* how many frequently used apps to show, and Clear History.
   - *Backup:* export your layout (pins, folders, hidden apps, places, appearance) to a file — e.g. in OneDrive — and import it later or on another Mac. Importing saves your current layout to the data folder first.
-- **About Mac2Seven** is in the menu bar icon's right-click menu.
+- **About Mac2Seven** and **Check for Updates…** are in the menu bar icon's right-click menu.
+- **Automatic updates** (via [Sparkle](https://sparkle-project.org)): Mac2Seven checks once a day and asks before installing. Turn it off in Settings → General.
 - **More than one display?** The menu opens on the screen your mouse is on.
 - **Data safety:** if a saved file ever can't be read, Mac2Seven renames it (`*.unreadable-<date>.json`) instead of overwriting it, and tells you.
 - **Hide apps:** right-click → *Hide*. Helpers, installers and uninstallers (names with Helper, Service, Agent, Uninstaller…, or starting with Remove) are hidden automatically unless you've pinned or filed them. Hidden apps live in a *Hidden* folder at the bottom of All Programs and still show up in search.
@@ -37,3 +38,12 @@ To sign it, select your team under the target's *Signing & Capabilities* tab (it
 The app icon is drawn by `Tools/make-icon.swift`; run `swift Tools/make-icon.swift` from the repo root to regenerate it.
 
 Debug-build launch flags (not in Release builds): `--open`, `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`.
+
+## Releasing a new version
+1. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml` (the build number must always go up).
+2. Write the release notes in `Tools/release-notes/vX.Y.md`.
+3. Commit and push.
+4. `Tools/release.sh` does a dry run: universal build, Developer ID signing, notarization, stapling, and a signed Sparkle feed in `dist/vX.Y/`.
+5. `Tools/release.sh --publish` does the same and creates the GitHub release with `Mac2Seven-X.Y.zip`, `Mac2Seven.zip` and `appcast.xml`. Installed copies find it through `releases/latest/download/appcast.xml`.
+
+This needs, on the releasing Mac: the Developer ID certificate, the `Mac2Seven-notary` notarytool profile, and the Sparkle private key in the keychain under the `Mac2Seven` account. Keep a backup of that key; without it, installed copies can't accept updates.
