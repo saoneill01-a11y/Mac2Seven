@@ -62,6 +62,7 @@ struct PrefsData: Codable, Equatable {
     var hotkey: HotkeySpec = .default
     var powerAction: PowerAction = .shutDown
     var frequentCount = 10
+    var autoHideHelpers = true
 
     init() {}
 
@@ -77,6 +78,7 @@ struct PrefsData: Codable, Equatable {
         hotkey = (try? c.decodeIfPresent(HotkeySpec.self, forKey: .hotkey)) ?? d.hotkey
         powerAction = (try? c.decodeIfPresent(PowerAction.self, forKey: .powerAction)) ?? d.powerAction
         frequentCount = (try? c.decodeIfPresent(Int.self, forKey: .frequentCount)) ?? d.frequentCount
+        autoHideHelpers = (try? c.decodeIfPresent(Bool.self, forKey: .autoHideHelpers)) ?? d.autoHideHelpers
     }
 
     static func defaultPlaces() -> [Place] {
@@ -107,6 +109,8 @@ final class Preferences: ObservableObject {
     }
     /// True while the shortcut recorder is listening, so the current shortcut doesn't fire.
     @Published var isRecordingHotkey = false
+    /// Which Settings tab is showing (not saved).
+    @Published var settingsTab = "general"
 
     let fileURL: URL
 

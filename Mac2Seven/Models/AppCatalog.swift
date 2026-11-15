@@ -4,6 +4,7 @@ import AppKit
 struct AppItem: Identifiable, Hashable {
     let path: String
     let name: String
+    var bundleID: String? = nil
     var id: String { path }
     var url: URL { URL(fileURLWithPath: path) }
 }
@@ -14,6 +15,8 @@ final class AppCatalog: ObservableObject {
     @Published private(set) var apps: [AppItem] = []
     private var byPath: [String: AppItem] = [:]
     private var scanning = false
+    /// Called with the full list after every scan (used to spot newly installed apps).
+    var onScan: (([AppItem]) -> Void)?
 
     func refresh() {
         guard !scanning else { return }
@@ -24,6 +27,7 @@ final class AppCatalog: ObservableObject {
                 self.apps = found
                 self.byPath = Dictionary(found.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
                 self.scanning = false
+                self.onScan?(found)
             }
         }
     }
@@ -66,7 +70,7 @@ final class AppCatalog: ObservableObject {
         guard FileManager.default.fileExists(atPath: path) else { return nil }
         var name = FileManager.default.displayName(atPath: path)
         if name.hasSuffix(".app") { name = String(name.dropLast(4)) }
-        return AppItem(path: path, name: name)
+        return AppItem(path: path, name: name, bundleID: Bundle(path: path)?.bundleIdentifier)
     }
 }
 

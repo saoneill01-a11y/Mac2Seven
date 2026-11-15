@@ -5,8 +5,14 @@ struct LeftColumn: View {
     @EnvironmentObject var catalog: AppCatalog
     @EnvironmentObject var library: Library
     @EnvironmentObject var files: FileSearch
+    @EnvironmentObject var prefs: Preferences
     @Environment(\.palette) private var p
     @FocusState private var searchFocused: Bool
+
+    /// Some newly installed (and not hidden) app is waiting in All Programs.
+    private var hasNewApps: Bool {
+        catalog.apps.contains { library.isNew($0.path) && !library.isHidden($0, autoHide: prefs.data.autoHideHelpers) }
+    }
 
     private var hits: [SearchHit] {
         SearchHit.compute(query: state.query, apps: catalog.apps, files: files.results)
@@ -63,6 +69,9 @@ struct LeftColumn: View {
                 Text(state.showingAll ? "Back" : "All Programs")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundStyle(p.text)
+                if !state.showingAll && hasNewApps {
+                    NewBadge()
+                }
                 Spacer()
             }
             .padding(.horizontal, 12)
@@ -133,7 +142,12 @@ struct HomeListView: View {
     var body: some View {
         let pinned = library.data.pinned.compactMap { catalog.item(for: $0) }
         let showFrequent = prefs.data.frequentCount > 0
-        let frequent = showFrequent ? library.frequent(limit: prefs.data.frequentCount).compactMap { catalog.item(for: $0) } : []
+        let autoHide = prefs.data.autoHideHelpers
+        let frequent = showFrequent
+            ? library.frequent(limit: prefs.data.frequentCount, excluding: { path in
+                catalog.item(for: path).map { library.isHidden($0, autoHide: autoHide) } ?? false
+              }).compactMap { catalog.item(for: $0) }
+            : []
 
         ScrollView {
             VStack(alignment: .leading, spacing: 1) {
@@ -195,6 +209,9 @@ struct AppRow: View {
                 .font(.system(size: iconSize > 20 ? 13 : 12, weight: bold ? .semibold : .regular))
                 .foregroundStyle(p.text)
                 .lineLimit(1)
+            if library.isNew(item.path) {
+                NewBadge()
+            }
             Spacer(minLength: 0)
         }
         .padding(.leading, 6 + indent)
@@ -221,10 +238,30 @@ struct AppRow: View {
     }
 }
 
+/// Small "New" tag for recently installed apps.
+struct NewBadge: View {
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        Text("New")
+            .font(.system(size: 9, weight: .bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .background(Capsule().fill(p.accent))
+    }
+}
+
 struct AppContextMenu: View {
     let path: String
     @EnvironmentObject var library: Library
     @EnvironmentObject var state: MenuState
+    @EnvironmentObject var catalog: AppCatalog
+    @EnvironmentObject var prefs: Preferences
+
+    private var isHidden: Bool {
+        catalog.item(for: path).map { library.isHidden($0, autoHide: prefs.data.autoHideHelpers) } ?? false
+    }
 
     var body: some View {
         Button("Open") {
@@ -255,6 +292,11 @@ struct AppContextMenu: View {
         }
         if library.folderContaining(path) != nil {
             Button("Remove from Folder") { library.move(path, to: nil) }
+        }
+        if isHidden {
+            Button("Unhide") { library.unhide(path) }
+        } else {
+            Button("Hide") { library.hide(path) }
         }
         Divider()
         Button("Show in Finder") {

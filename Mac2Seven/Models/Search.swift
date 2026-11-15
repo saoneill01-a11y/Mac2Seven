@@ -19,6 +19,10 @@ final class MenuState: ObservableObject {
     @Published var dropLine: DropLine?
     var hitCount = 0
     var closeHandler: () -> Void = {}
+    /// Opens the Settings window on a tab ("general", "appearance", "places", "organize", "history").
+    var openSettingsHandler: (String) -> Void = { _ in }
+
+    func openSettings(_ tab: String) { openSettingsHandler(tab) }
 
     struct DropLine: Equatable {
         let id: String

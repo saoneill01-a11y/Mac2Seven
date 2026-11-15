@@ -13,7 +13,10 @@ A menu bar app launcher with a classic two-column Start-menu layout.
   - *General:* Launch at Login, the shortcut that opens the menu, and what the power button does.
   - *Appearance:* Light / Dark / Match System, the Glass or Flat theme, and the accent color.
   - *Places:* edit the right-hand column (add folders or apps, separators, rename, reorder), and switch Documents/Pictures/Desktop to your OneDrive folders in one click.
+  - *Organize:* suggests folders by developer (Microsoft, Autodesk…) and creates them in one click; after that, new apps from those developers file themselves. Also controls auto-hiding of helpers and lists hidden apps.
   - *History:* how many frequently used apps to show, and Clear History.
+- **Hide apps:** right-click → *Hide*. Helpers, installers and uninstallers (names with Helper, Service, Agent, Uninstaller…, or starting with Remove) are hidden automatically unless you've pinned or filed them. Hidden apps live in a *Hidden* folder at the bottom of All Programs and still show up in search.
+- **New apps** get a *New* badge for a week (or until you open them), and All Programs shows the badge when something new is waiting.
 
 Your pins, folders and history are stored in `~/Library/Application Support/Mac2Seven/library.json`; settings are in `settings.json` in the same folder.
 
@@ -27,4 +30,4 @@ open Mac2Seven.xcodeproj
 
 To sign it, select your team under the target's *Signing & Capabilities* tab (it is ad-hoc signed by default).
 
-Debug launch flags: `--open`, `--open --query text`, `--open --all`, `--settings [general|appearance|places|history]`.
+Debug launch flags: `--open`, `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`.

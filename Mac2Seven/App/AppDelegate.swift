@@ -33,9 +33,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         library.load()
         library.startTracking()
+        // Each scan spots newly installed apps (New badge) and files them into their developer's folder.
+        catalog.onScan = { [weak self] apps in self?.library.noteScan(apps) }
         catalog.refresh()
 
         menuState.closeHandler = { [weak self] in self?.closePanel() }
+        menuState.openSettingsHandler = { [weak self] tab in self?.openSettings(tab: tab) }
         menuState.library = library
         let root = StartMenuView()
             .environmentObject(catalog)
@@ -56,8 +59,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         installKeyMonitor()
 
-        if CommandLine.arguments.contains("--settings") {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.openSettings() }
+        // Debug: --settings [tab]
+        if let i = CommandLine.arguments.firstIndex(of: "--settings") {
+            let args = CommandLine.arguments
+            let tab = i + 1 < args.count && !args[i + 1].hasPrefix("--") ? args[i + 1] : "general"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.openSettings(tab: tab) }
         }
         if CommandLine.arguments.contains("--open") {
             // Debug helpers: --open [--query text | --all]
@@ -102,7 +108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         open.target = self
         menu.addItem(open)
         menu.addItem(.separator())
-        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettingsFromMenu), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
         let reveal = NSMenuItem(title: "Show Data Folder", action: #selector(revealLibrary), keyEquivalent: "")
@@ -125,12 +131,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: Settings window
 
-    @objc func openSettings() {
+    @objc func openSettingsFromMenu() {
+        openSettings(tab: nil)
+    }
+
+    func openSettings(tab: String?) {
         closePanel()
+        if let tab { prefs.settingsTab = tab }
         if settingsWindow == nil {
             let view = SettingsView()
                 .environmentObject(prefs)
                 .environmentObject(library)
+                .environmentObject(catalog)
             let window = NSWindow(contentViewController: NSHostingController(rootView: view))
             window.title = "Mac2Seven Settings"
             window.styleMask = [.titled, .closable, .miniaturizable]
@@ -140,6 +152,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         NSApp.activate()
         settingsWindow?.makeKeyAndOrderFront(nil)
+        // Nothing needs keyboard focus on open; otherwise the tab bar shows a stray focus ring.
+        DispatchQueue.main.async { [weak self] in self?.settingsWindow?.makeFirstResponder(nil) }
     }
 
     // MARK: Hotkey
@@ -213,7 +227,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 state.selection = max(state.selection - 1, 0)
                 return nil
             case kVK_ANSI_Comma where event.modifierFlags.contains(.command):
-                self.openSettings()
+                self.openSettings(tab: nil)
                 return nil
             default:
                 return event

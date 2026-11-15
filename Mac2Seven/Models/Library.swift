@@ -5,6 +5,8 @@ struct Folder: Codable, Identifiable, Hashable {
     var name: String
     var apps: [String] = []
     var children: [Folder] = []
+    /// Developer this folder collects (e.g. "com.microsoft"); new apps from them are filed here automatically.
+    var developer: String? = nil
 }
 
 struct Usage: Codable, Hashable {
@@ -18,6 +20,12 @@ struct LibraryData: Codable {
     var usage: [String: Usage] = [:]
     /// Custom order of the apps at the top level of All Programs. Empty means alphabetical.
     var rootOrder: [String] = []
+    /// Apps the user hid.
+    var hidden: [String] = []
+    /// Apps the user unhid or placed themselves; never auto-hidden again.
+    var unhidden: [String] = []
+    /// When each app was first seen (distant past for apps already installed or launched), for the New badge.
+    var known: [String: Date] = [:]
 
     init() {}
 
@@ -28,6 +36,9 @@ struct LibraryData: Codable {
         folders = try c.decodeIfPresent([Folder].self, forKey: .folders) ?? []
         usage = try c.decodeIfPresent([String: Usage].self, forKey: .usage) ?? [:]
         rootOrder = try c.decodeIfPresent([String].self, forKey: .rootOrder) ?? []
+        hidden = (try? c.decodeIfPresent([String].self, forKey: .hidden)) ?? []
+        unhidden = (try? c.decodeIfPresent([String].self, forKey: .unhidden)) ?? []
+        known = (try? c.decodeIfPresent([String: Date].self, forKey: .known)) ?? [:]
     }
 }
 
@@ -131,10 +142,14 @@ final class Library: ObservableObject {
         guard path != ownPath else { return }
         if let last = lastRecord, last.path == path, Date().timeIntervalSince(last.time) < 5 { return }
         lastRecord = (path, Date())
-        var usage = data.usage[path] ?? Usage(count: 0, last: .distantPast)
+        var d = data
+        var usage = d.usage[path] ?? Usage(count: 0, last: .distantPast)
         usage.count += 1
         usage.last = Date()
-        data.usage[path] = usage
+        d.usage[path] = usage
+        // Opening an app clears its New badge.
+        if d.known[path] != nil { d.known[path] = .distantPast }
+        data = d
     }
 
     func launch(_ path: String) {
@@ -145,7 +160,7 @@ final class Library: ObservableObject {
     }
 
     /// Frequently used apps, ranked by launch count with older launches fading out.
-    func frequent(limit: Int = 10) -> [String] {
+    func frequent(limit: Int = 10, excluding isHidden: (String) -> Bool = { _ in false }) -> [String] {
         let now = Date()
         let pinned = Set(data.pinned)
         func score(_ u: Usage) -> Double {
@@ -153,7 +168,7 @@ final class Library: ObservableObject {
             return Double(u.count) * exp(-days / 10) + 2 * exp(-days)
         }
         return data.usage
-            .filter { !pinned.contains($0.key) && FileManager.default.fileExists(atPath: $0.key) }
+            .filter { !pinned.contains($0.key) && !isHidden($0.key) && FileManager.default.fileExists(atPath: $0.key) }
             .sorted { score($0.value) > score($1.value) }
             .prefix(limit)
             .map(\.key)
@@ -168,12 +183,184 @@ final class Library: ObservableObject {
         data.usage = [:]
     }
 
+    // MARK: Hiding
+
+    /// Whole words that mark an app as a helper rather than something you open yourself.
+    static let helperWords: Set<String> = [
+        "helper", "server", "service", "shim", "agent", "daemon",
+        "installer", "uninstaller", "uninstall", "updater",
+    ]
+
+    /// "3DconnexionHelper" → words "3dconnexion", "helper" → true. "Autodesk Fusion" → false.
+    static func looksLikeHelper(_ name: String) -> Bool {
+        let spaced = name.replacingOccurrences(
+            of: "(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", with: " ", options: .regularExpression)
+        let words = spaced.lowercased().split { !$0.isLetter && !$0.isNumber }.map(String.init)
+        if let first = words.first, first == "remove" || first == "uninstall" { return true }
+        return words.contains { helperWords.contains($0) }
+    }
+
+    /// Hidden by the user, or auto-hidden as a helper (unless pinned, filed in a folder, or unhidden by the user).
+    func isHidden(_ item: AppItem, autoHide: Bool) -> Bool {
+        if data.hidden.contains(item.path) { return true }
+        guard autoHide, Self.looksLikeHelper(item.name) else { return false }
+        return !isPinned(item.path) && folderContaining(item.path) == nil && !data.unhidden.contains(item.path)
+    }
+
+    func isManuallyHidden(_ path: String) -> Bool { data.hidden.contains(path) }
+
+    /// Hides an app: takes it off the pinned list and out of any folder.
+    func hide(_ path: String) {
+        var d = data
+        d.pinned.removeAll { $0 == path }
+        func strip(_ list: inout [Folder]) {
+            for i in list.indices {
+                list[i].apps.removeAll { $0 == path }
+                strip(&list[i].children)
+            }
+        }
+        strip(&d.folders)
+        d.unhidden.removeAll { $0 == path }
+        if !d.hidden.contains(path) { d.hidden.append(path) }
+        data = d
+    }
+
+    func unhide(_ path: String) {
+        var d = data
+        d.hidden.removeAll { $0 == path }
+        if !d.unhidden.contains(path) { d.unhidden.append(path) }
+        data = d
+    }
+
+    /// Apps the user places by hand count as wanted: un-hide them and keep them visible from now on.
+    private func reveal(_ paths: [String]) {
+        var d = data
+        var changed = false
+        for path in paths {
+            let name = ((path as NSString).lastPathComponent as NSString).deletingPathExtension
+            if d.hidden.contains(path) {
+                d.hidden.removeAll { $0 == path }
+                changed = true
+            } else if !Self.looksLikeHelper(name) {
+                continue
+            }
+            if !d.unhidden.contains(path) {
+                d.unhidden.append(path)
+                changed = true
+            }
+        }
+        if changed { data = d }
+    }
+
+    // MARK: New apps
+
+    static let newBadgeDuration: TimeInterval = 7 * 86_400
+
+    func isNew(_ path: String) -> Bool {
+        guard let first = data.known[path] else { return false }
+        return Date().timeIntervalSince(first) < Self.newBadgeDuration
+    }
+
+    /// Called after each scan: notes newly installed apps (for the New badge) and files them into
+    /// their developer's folder when there is one. On the very first scan everything counts as old.
+    func noteScan(_ apps: [AppItem]) {
+        var d = data
+        let firstRun = d.known.isEmpty
+        var added: [AppItem] = []
+        for app in apps where d.known[app.path] == nil {
+            d.known[app.path] = firstRun ? .distantPast : Date()
+            if !firstRun { added.append(app) }
+        }
+        guard d.known.count != data.known.count else { return }
+        data = d
+
+        for app in added where !data.hidden.contains(app.path) && !Self.looksLikeHelper(app.name)
+            && folderContaining(app.path) == nil {
+            if let key = Self.developerKey(app.bundleID), let folder = folderForDeveloper(key) {
+                move([app.path], to: folder)
+            }
+        }
+    }
+
+    // MARK: Organize by developer
+
+    /// "com.microsoft.Word" → "com.microsoft". Apple's own apps and Chrome web-app wrappers aren't grouped.
+    static func developerKey(_ bundleID: String?) -> String? {
+        guard let id = bundleID?.lowercased(),
+              !id.hasPrefix("com.apple."), !id.hasPrefix("com.google.chrome.app.") else { return nil }
+        let parts = id.split(separator: ".")
+        guard parts.count >= 3 else { return nil }
+        return parts[0] + "." + parts[1]
+    }
+
+    static let knownDevelopers: [String: String] = [
+        "com.microsoft": "Microsoft", "com.google": "Google", "com.adobe": "Adobe",
+        "com.autodesk": "Autodesk", "com.logi": "Logitech", "com.logitech": "Logitech",
+        "com.bambulab": "Bambu Lab", "com.3dconnexion": "3Dconnexion", "com.mspanywhere": "MSP Anywhere",
+        "com.jetbrains": "JetBrains", "com.splashtop": "Splashtop", "us.zoom": "Zoom",
+    ]
+
+    static func suggestedName(_ key: String) -> String {
+        if let known = knownDevelopers[key] { return known }
+        let part = key.split(separator: ".").last.map(String.init) ?? key
+        return part.prefix(1).uppercased() + part.dropFirst()
+    }
+
+    func folderForDeveloper(_ key: String) -> UUID? {
+        flatFolders().first { $0.folder.developer == key }?.folder.id
+    }
+
+    struct FolderSuggestion: Identifiable {
+        let id: String          // developer key
+        var name: String
+        let apps: [AppItem]     // apps that would move
+        let existing: UUID?     // folder they'd join, if one already holds this developer's apps
+        let existingName: String?
+    }
+
+    /// Developers with apps that aren't in a folder yet. Joins an existing folder when one already
+    /// holds that developer's apps; otherwise suggests a new folder (only when there are 2+ apps).
+    func suggestions(from apps: [AppItem], autoHide: Bool) -> [FolderSuggestion] {
+        let folders = flatFolders()
+        var groups: [String: [AppItem]] = [:]
+        for app in apps where !isHidden(app, autoHide: autoHide) {
+            if let key = Self.developerKey(app.bundleID) { groups[key, default: []].append(app) }
+        }
+        var result: [FolderSuggestion] = []
+        for (key, group) in groups {
+            let unfiled = group.filter { folderContaining($0.path) == nil }
+            guard !unfiled.isEmpty else { continue }
+            var existing = folderForDeveloper(key)
+            if existing == nil {
+                // The folder already holding most of this developer's apps.
+                let counts = Dictionary(grouping: group.compactMap { folderContaining($0.path) }, by: { $0 })
+                existing = counts.max { $0.value.count < $1.value.count }?.key
+            }
+            if existing == nil && unfiled.count < 2 { continue }
+            let existingName = existing.flatMap { id in folders.first { $0.folder.id == id }?.folder.name }
+            result.append(FolderSuggestion(id: key, name: existingName ?? Self.suggestedName(key),
+                                           apps: unfiled, existing: existing, existingName: existingName))
+        }
+        return result.sorted { $0.apps.count != $1.apps.count ? $0.apps.count > $1.apps.count : $0.name < $1.name }
+    }
+
+    /// Creates (or fills) the chosen folders and remembers each folder's developer for future installs.
+    func applySuggestions(_ chosen: [FolderSuggestion]) {
+        for suggestion in chosen {
+            let name = suggestion.name.trimmingCharacters(in: .whitespacesAndNewlines)
+            let id = suggestion.existing ?? addFolder(parent: nil, name: name.isEmpty ? Self.suggestedName(suggestion.id) : name)
+            _ = Self.mutate(&data.folders, id: id) { $0.developer = suggestion.id }
+            move(suggestion.apps.map(\.path), to: id)
+        }
+    }
+
     // MARK: Pins
 
     func isPinned(_ path: String) -> Bool { data.pinned.contains(path) }
 
     func pin(_ path: String) {
         guard !isPinned(path) else { return }
+        reveal([path])
         data.pinned.append(path)
     }
 
@@ -184,6 +371,7 @@ final class Library: ObservableObject {
     /// Pins (or reorders) apps next to `target`, or at the end when there is no target.
     func placePins(_ paths: [String], relativeTo target: String?, edge: DropEdge) {
         guard !paths.isEmpty else { return }
+        reveal(paths)
         if let target, paths.contains(target) { return } // dropped onto itself
         var pins = data.pinned.filter { !paths.contains($0) }
         pins.insert(contentsOf: paths, at: Self.insertionIndex(in: pins, target: target, edge: edge))
@@ -247,6 +435,18 @@ final class Library: ObservableObject {
         _ = Self.mutate(&data.folders, id: id) { $0.name = name }
     }
 
+    /// Sorts a folder's apps by name, A to Z (and its subfolders, which always sit above the apps).
+    func sortFolder(_ id: UUID) {
+        func name(_ path: String) -> String {
+            let display = FileManager.default.displayName(atPath: path)
+            return display.hasSuffix(".app") ? String(display.dropLast(4)) : display
+        }
+        _ = Self.mutate(&data.folders, id: id) { folder in
+            folder.apps.sort { name($0).localizedStandardCompare(name($1)) == .orderedAscending }
+            folder.children.sort { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+    }
+
     /// Deletes a folder and its subfolders. Their apps go back to the top level of All Programs.
     func deleteFolder(_ id: UUID) {
         func remove(_ folders: inout [Folder]) {
@@ -263,6 +463,7 @@ final class Library: ObservableObject {
     /// Files apps into a folder next to `target` (or at the end), or back to the top level when `folderID` is nil.
     func move(_ paths: [String], to folderID: UUID?, relativeTo target: String? = nil, edge: DropEdge = .after) {
         guard !paths.isEmpty else { return }
+        reveal(paths)
         if let target, paths.contains(target) { return } // dropped onto itself
         var folders = data.folders
         func strip(_ list: inout [Folder]) {

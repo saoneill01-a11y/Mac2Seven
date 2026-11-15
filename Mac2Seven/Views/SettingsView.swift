@@ -4,17 +4,10 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct SettingsView: View {
-    /// Debug: `--settings <tab>` opens on that tab (general, appearance, places, history).
-    @State private var tab: String = {
-        let args = CommandLine.arguments
-        if let i = args.firstIndex(of: "--settings"), i + 1 < args.count, !args[i + 1].hasPrefix("--") {
-            return args[i + 1]
-        }
-        return "general"
-    }()
+    @EnvironmentObject var prefs: Preferences
 
     var body: some View {
-        TabView(selection: $tab) {
+        TabView(selection: $prefs.settingsTab) {
             GeneralSettings()
                 .tabItem { Label("General", systemImage: "gearshape") }
                 .tag("general")
@@ -24,11 +17,14 @@ struct SettingsView: View {
             PlacesSettings()
                 .tabItem { Label("Places", systemImage: "folder") }
                 .tag("places")
+            OrganizeSettings()
+                .tabItem { Label("Organize", systemImage: "wand.and.stars") }
+                .tag("organize")
             HistorySettings()
                 .tabItem { Label("History", systemImage: "clock") }
                 .tag("history")
         }
-        .frame(width: 560, height: 540)
+        .frame(width: 580, height: 600)
     }
 }
 
@@ -367,6 +363,108 @@ struct PlaceEditorRow: View {
                 }
             }
         }
+    }
+}
+
+// MARK: Organize
+
+struct OrganizeSettings: View {
+    @EnvironmentObject var prefs: Preferences
+    @EnvironmentObject var library: Library
+    @EnvironmentObject var catalog: AppCatalog
+    @State private var suggestions: [Library.FolderSuggestion] = []
+    @State private var chosen: Set<String> = []
+
+    private var hidden: [AppItem] {
+        catalog.apps.filter { library.isHidden($0, autoHide: prefs.data.autoHideHelpers) }
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                if suggestions.isEmpty {
+                    Text("Nothing to suggest: every developer with more than one app is already in a folder.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach($suggestions) { $s in
+                        HStack(alignment: .top, spacing: 10) {
+                            Toggle("", isOn: Binding(
+                                get: { chosen.contains(s.id) },
+                                set: { on in if on { chosen.insert(s.id) } else { chosen.remove(s.id) } }
+                            ))
+                            .labelsHidden()
+                            .toggleStyle(.checkbox)
+                            VStack(alignment: .leading, spacing: 3) {
+                                if let existingName = s.existingName {
+                                    Text("Add to “\(existingName)”").fontWeight(.medium)
+                                } else {
+                                    HStack(spacing: 6) {
+                                        Text("New folder:")
+                                        TextField("", text: $s.name, prompt: Text("Folder name"))
+                                            .labelsHidden()
+                                            .textFieldStyle(.roundedBorder)
+                                            .multilineTextAlignment(.leading)
+                                            .frame(width: 200)
+                                    }
+                                }
+                                Text(s.apps.map(\.name).sorted().joined(separator: ", "))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                    }
+                    HStack {
+                        Spacer()
+                        Button(chosen.count == 1 ? "Create 1 Folder" : "Create \(chosen.count) Folders") {
+                            library.applySuggestions(suggestions.filter { chosen.contains($0.id) })
+                            refresh()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(chosen.isEmpty)
+                    }
+                }
+            } header: {
+                Text("Folders by developer")
+            } footer: {
+                Text("Untick anything you don't want. Afterwards, new apps from these developers go straight into their folder.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
+                Toggle("Hide helpers, installers and uninstallers automatically", isOn: $prefs.data.autoHideHelpers)
+            } footer: {
+                Text("Apps whose names include Helper, Service, Server, Agent, Shim, Updater, Installer or Uninstaller, or start with Remove, go to the Hidden folder at the bottom of All Programs. Apps you've pinned, put in a folder or unhidden are never hidden. Search still finds hidden apps.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section("Hidden apps (\(hidden.count))") {
+                if hidden.isEmpty {
+                    Text("None").foregroundStyle(.secondary)
+                } else {
+                    ForEach(hidden) { app in
+                        HStack(spacing: 8) {
+                            Image(nsImage: IconCache.icon(app.path)).resizable().frame(width: 18, height: 18)
+                            Text(app.name)
+                            Spacer()
+                            Text(library.isManuallyHidden(app.path) ? "Hidden by you" : "Auto-hidden")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Button("Unhide") { library.unhide(app.path) }
+                        }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear(perform: refresh)
+        .onChange(of: catalog.apps.count) { _, _ in refresh() }
+        .onChange(of: prefs.data.autoHideHelpers) { _, _ in refresh() }
+    }
+
+    private func refresh() {
+        suggestions = library.suggestions(from: catalog.apps, autoHide: prefs.data.autoHideHelpers)
+        chosen = Set(suggestions.map(\.id))
     }
 }
 

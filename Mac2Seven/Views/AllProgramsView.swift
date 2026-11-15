@@ -4,20 +4,30 @@ struct AllProgramsView: View {
     @EnvironmentObject var library: Library
     @EnvironmentObject var catalog: AppCatalog
     @EnvironmentObject var state: MenuState
+    @EnvironmentObject var prefs: Preferences
     @State private var expanded: Set<UUID> = []
     @State private var editing: UUID?
     @State private var topDropTarget = false
 
     var body: some View {
-        let loose = library.looseApps(from: catalog.apps)
+        let autoHide = prefs.data.autoHideHelpers
+        let loose = library.looseApps(from: catalog.apps).filter { !library.isHidden($0, autoHide: autoHide) }
         let looseOrder = loose.map(\.path)
+        let hidden = catalog.apps.filter { library.isHidden($0, autoHide: autoHide) }
 
         VStack(spacing: 0) {
-            HStack {
+            HStack(spacing: 12) {
                 Text("All Programs")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.secondary)
                 Spacer()
+                Button {
+                    state.openSettings("organize")
+                } label: {
+                    Label("Organize…", systemImage: "wand.and.stars")
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.borderless)
                 Button {
                     editing = library.addFolder(parent: nil)
                 } label: {
@@ -42,6 +52,9 @@ struct AllProgramsView: View {
                                 library.placeAtTop(paths, relativeTo: item.path, edge: edge, current: looseOrder)
                             }
                     }
+                    if !hidden.isEmpty {
+                        HiddenSection(apps: hidden)
+                    }
                 }
                 .padding(6)
                 .background(ScrollViewHook(scroller: state.autoScroller))
@@ -53,6 +66,51 @@ struct AllProgramsView: View {
                 library.nestFolder(id, into: nil)
             }
         }
+    }
+}
+
+/// Collapsible "Hidden" group at the bottom of All Programs. Drag an app out, or right-click → Unhide.
+struct HiddenSection: View {
+    let apps: [AppItem]
+    @EnvironmentObject var state: MenuState
+    @Environment(\.palette) private var p
+    @State private var open = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            HStack(spacing: 7) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 9, weight: .bold))
+                    .rotationEffect(.degrees(open ? 90 : 0))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 10)
+                Image(systemName: "eye.slash")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 16)
+                Text("Hidden (\(apps.count))")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 6)
+            .padding(.trailing, 6)
+            .padding(.vertical, 3)
+            .background(RowHighlight(active: state.hoveredID == "hidden-section" && !state.isDragging))
+            .contentShape(Rectangle())
+            .trackHover("hidden-section", state: state)
+            .onTapGesture {
+                withAnimation(.easeOut(duration: 0.12)) { open.toggle() }
+            }
+            .help("Helpers and apps you've hidden. Right-click one to unhide it, or drag it out.")
+
+            if open {
+                ForEach(apps) { item in
+                    AppRow(item: item, iconSize: 16, indent: 33)
+                        .opacity(0.7)
+                }
+            }
+        }
+        .padding(.top, 6)
     }
 }
 
@@ -182,6 +240,10 @@ struct FolderTree: View {
         }
         .contextMenu {
             Button("Rename") { editing = folder.id }
+            Button("Sort A to Z") {
+                withAnimation(.easeOut(duration: 0.15)) { library.sortFolder(folder.id) }
+                expanded.insert(folder.id)
+            }
             Button("New Subfolder") {
                 let id = library.addFolder(parent: folder.id)
                 expanded.insert(folder.id)
