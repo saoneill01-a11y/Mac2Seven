@@ -11,7 +11,8 @@ struct LeftColumn: View {
 
     /// Some newly installed (and not hidden) app is waiting in All Programs.
     private var hasNewApps: Bool {
-        catalog.apps.contains { library.isNew($0.path) && !library.isHidden($0, autoHide: prefs.data.autoHideHelpers) }
+        guard !DemoMode.isOn else { return false } // sample screenshots shouldn't flag every app as new
+        return catalog.apps.contains { library.isNew($0.path) && !library.isHidden($0, autoHide: prefs.data.autoHideHelpers) }
     }
 
     private var hits: [SearchHit] {
