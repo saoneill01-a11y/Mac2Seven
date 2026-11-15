@@ -45,3 +45,13 @@ targets:
         CODE_SIGN_IDENTITY: "-"
         COMBINE_HIDPI_IMAGES: YES
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      configs:
+        # Release builds are signed with the Developer ID certificate (with a secure timestamp)
+        # so they can be notarized and opened on any Mac. Debug builds stay ad-hoc signed.
+        Release:
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Developer ID Application"
+          DEVELOPMENT_TEAM: Z6U97H9M93
+          OTHER_CODE_SIGN_FLAGS: "--timestamp"
+          # No debugger attach permission in builds we ship (notarization rejects it).
+          CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
