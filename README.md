@@ -1,9 +1,9 @@
 # Mac2Seven
 
-A menu bar app launcher with a classic two-column Start-menu layout, plus an optional Windows-style taskbar.
+A menu bar app launcher with a classic two-column Start-menu layout, plus an optional Windows-style taskbar and a Snipping Tool-style screenshot tool.
 
 <p align="center">
-  <img src="Marketing/mac2seven-menu-light.png" alt="The Mac2Seven menu: search, pinned and frequently used apps on the left, places and a Shut down button on the right" width="440">
+  <img src="Marketing/mac2seven-taskbar.png" alt="Mac2Seven on a Mac desktop: the Start menu open above the taskbar's Start button, a calendar with a live clock above the time, open apps on the taskbar, and the Snip scissors next to the clock" width="900">
 </p>
 
 **[Download Mac2Seven](https://github.com/saoneill01-a11y/Mac2Seven/releases/latest/download/Mac2Seven.dmg)** · macOS 14 or later · signed and notarized
