@@ -14,10 +14,11 @@ A menu bar app launcher with a classic two-column Start-menu layout, plus an opt
 - **Frequently used:** fills in automatically from the apps you launch.
 - **All Programs:** make folders (and subfolders), then drag apps anywhere into a folder (its title or, when open, anywhere in its contents) or use right-click → *Move to Folder*. Drag apps up or down to reorder them, at the top level or inside a folder. Drag a folder onto another folder's title to put it above or below; drop it inside an open folder to make it a subfolder, or on empty space to move it back to the top level. Hovering a closed folder while dragging opens it. Right-click a folder to rename or delete it.
 - **Search:** just start typing. Use ↑/↓ to pick a result and Return to open it. Esc clears the search, then closes the menu.
-- **Right-click the menu bar icon** for Settings, Show Data Folder, and Quit. New apps appear automatically: the menu rescans your app folders every time it opens.
+- **Right-click the menu bar icon** for Take Screenshot, Settings, Show Data Folder, and Quit. New apps appear automatically: the menu rescans your app folders every time it opens.
 - **Settings** (right-click → Settings…, or ⌘, while the menu is open):
   - *General:* Launch at Login, the shortcut that opens the menu, and what the power button does.
   - *Taskbar:* turn the taskbar on and set it up (see [Taskbar](#taskbar) below).
+  - *Screenshots:* the Snip shortcut, save folder and what happens after a capture (see [Snip](#snip-screenshots) below).
   - *Appearance:* Light / Dark / Match System, the Glass or Flat theme, and the accent color.
   - *Places:* edit the right-hand column (add folders or apps, separators, rename, reorder), and switch Documents/Pictures/Desktop to your OneDrive folders in one click.
   - *Organize:* suggests folders by developer (Microsoft, Autodesk…) and creates them in one click; after that, new apps from those developers file themselves. Also controls auto-hiding of helpers and lists hidden apps.
@@ -50,6 +51,18 @@ The taskbar needs two permissions; Settings → Taskbar shows whether each is al
 - **Screen Recording** for live previews. Without it, previews show the app's icon.
 
 If Mac2Seven is already on the Accessibility list but the ⚠︎ stays (this can happen after the app is replaced), remove it from the list in System Settings and add it again.
+
+## Snip (screenshots)
+Mac2Seven Snip is a screenshot tool that works like the Windows Snipping Tool, with a toolbar like the Mac's ⌘⇧5.
+
+- **Start it** with **⌥⇧S**, the scissors next to the taskbar clock, *Mac2Seven Snip* at the top of All Programs, or *Take Screenshot* in the menu bar icon's right-click menu. The screen dims and a toolbar appears at the bottom.
+- **Rectangle:** drag to select an area. Drag the middle to move it, or the edges and corners to resize it, then press **Capture** or Return. Rectangle mode starts with the last rectangle you captured.
+- **Window:** move over a window to highlight it, then click it.
+- **Full screen:** click a display, or press Capture for the one the pointer is on.
+- **Freeform:** draw any shape. Drag it by the middle to move it, then press Capture. Outside the shape is transparent in the saved image.
+- **Timer:** no delay, 3, 5 or 10 seconds, for menus that close when you click away. **Options:** where to save, what happens after capture, and whether to include the pointer and window shadow.
+- **After capture** the image is copied to the clipboard, saved as a PNG in **Pictures › Screenshots** (named like `Screenshot 2026-11-15 at 3.41.02 PM.png`), opened in **Preview** for markup, and shown as a thumbnail in the corner (click it to show the file in Finder). Each of these can be turned off in **Settings → Screenshots**, where you can also change the shortcut and the folder.
+- Press **Esc** to cancel. Snip uses the same **Screen Recording** permission as the taskbar's window previews.
 
 ## Build
 The Xcode project is generated from `project.yml` with [XcodeGen](https://github.com/yonaskolb/XcodeGen):
