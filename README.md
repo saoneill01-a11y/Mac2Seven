@@ -63,7 +63,7 @@ To sign it, select your team under the target's *Signing & Capabilities* tab (it
 
 The app icon is drawn by `Tools/make-icon.swift`; run `swift Tools/make-icon.swift` from the repo root to regenerate it.
 
-Debug-build launch flags (not in Release builds): `--data-dir <path>`, which reads and writes `library.json` and `settings.json` in that folder instead of your real ones, `--calendar` (opens the taskbar clock's calendar), `--open` (add `--bottom` for the taskbar layout), `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`, `--demo [--all]`, and `--demo --taskbar` (the taskbar with the Start menu and calendar open), which stages the menu with sample content for screenshots like the ones in `Marketing/`.
+Debug-build launch flags (not in Release builds): `--data-dir <path>`, which reads and writes `library.json` and `settings.json` in that folder instead of your real ones, `--calendar` (opens the taskbar clock's calendar), `--test-bars N` (N taskbars stacked on one display, for testing several displays) with `--hover-report <file>`, `--open` (add `--bottom` for the taskbar layout), `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`, `--demo [--all]`, and `--demo --taskbar` (the taskbar with the Start menu and calendar open), which stages the menu with sample content for screenshots like the ones in `Marketing/`.
 
 ## Releasing a new version
 1. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml` (the build number must always go up).
