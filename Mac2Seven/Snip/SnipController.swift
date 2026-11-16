@@ -2,6 +2,7 @@ import AppKit
 import Combine
 import ScreenCaptureKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// What the toolbar shows and changes.
 @MainActor
@@ -10,6 +11,22 @@ final class SnipModel: ObservableObject {
     @Published var delay = 0
     @Published var hasSelection = false
     @Published var countdown: Int?
+}
+
+/// One finished capture, kept for the thumbnail's right-click menu.
+final class SnipShot {
+    let png: Data
+    let image: NSImage
+    /// The file in the screenshots folder (or wherever it was last saved), if any.
+    var file: URL?
+    /// A temporary copy for Preview or Photos when it wasn't saved.
+    var tempFile: URL?
+
+    init(png: Data, image: NSImage, file: URL?) {
+        self.png = png
+        self.image = image
+        self.file = file
+    }
 }
 
 /// Mac2Seven Snip: pick an area, window, display or freeform shape, then capture it to the clipboard,
@@ -409,27 +426,92 @@ final class SnipController {
         let pointSize = NSSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)
         let nsImage = NSImage(cgImage: image, size: pointSize)
 
-        if settings.copyToClipboard {
-            let pb = NSPasteboard.general
-            pb.clearContents()
-            pb.setData(png, forType: .png)
-            if let tiff = nsImage.tiffRepresentation { pb.setData(tiff, forType: .tiff) }
-        }
-
         var fileURL: URL?
         if settings.autoSave {
             fileURL = save(png, in: URL(fileURLWithPath: settings.saveFolder, isDirectory: true))
         }
-        if settings.openInPreview {
-            // Preview needs a file even when auto-save is off.
-            let url = fileURL ?? save(png, in: FileManager.default.temporaryDirectory.appendingPathComponent("Mac2Seven Snips"))
-            if let url {
-                NSWorkspace.shared.open([url], withApplicationAt: URL(fileURLWithPath: "/System/Applications/Preview.app"),
-                                        configuration: NSWorkspace.OpenConfiguration())
-            }
-        }
+        let shot = SnipShot(png: png, image: nsImage, file: fileURL)
+        if settings.copyToClipboard { copy(shot) }
+        if settings.openInPreview { openInPreview(shot) }
         playSound()
-        if settings.showThumbnail { showThumbnail(nsImage, file: fileURL) }
+        if settings.showThumbnail { showThumbnail(shot) }
+    }
+
+    // MARK: Thumbnail menu actions
+
+    func copy(_ shot: SnipShot) {
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setData(shot.png, forType: .png)
+        if let tiff = shot.image.tiffRepresentation { pb.setData(tiff, forType: .tiff) }
+    }
+
+    /// The saved file, or a temporary copy for apps that need a file.
+    private func fileForOpening(_ shot: SnipShot) -> URL? {
+        if let file = shot.file, FileManager.default.fileExists(atPath: file.path) { return file }
+        if let temp = shot.tempFile, FileManager.default.fileExists(atPath: temp.path) { return temp }
+        shot.tempFile = save(shot.png, in: FileManager.default.temporaryDirectory.appendingPathComponent("Mac2Seven Snips"))
+        return shot.tempFile
+    }
+
+    private func open(_ shot: SnipShot, with app: String) {
+        guard let url = fileForOpening(shot) else { return NSSound.beep() }
+        NSWorkspace.shared.open([url], withApplicationAt: URL(fileURLWithPath: app),
+                                configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    func openInPreview(_ shot: SnipShot) {
+        open(shot, with: "/System/Applications/Preview.app")
+    }
+
+    /// Opening an image with Photos imports it into the library.
+    func saveToPhotos(_ shot: SnipShot) {
+        hideThumbnail()
+        open(shot, with: "/System/Applications/Photos.app")
+    }
+
+    func save(_ shot: SnipShot, to directory: FileManager.SearchPathDirectory) {
+        guard let folder = FileManager.default.urls(for: directory, in: .userDomainMask).first,
+              let url = save(shot.png, in: folder) else { return NSSound.beep() }
+        if shot.file == nil { shot.file = url }
+        hideThumbnail()
+    }
+
+    func saveAs(_ shot: SnipShot) {
+        hideThumbnail()
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.png]
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = (shot.file?.lastPathComponent) ?? "Screenshot " + Self.nameFormat.string(from: Date()) + ".png"
+        panel.directoryURL = URL(fileURLWithPath: settings.saveFolder, isDirectory: true)
+        NSApp.activate()
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try shot.png.write(to: url)
+            shot.file = url
+        } catch {
+            NSSound.beep()
+            NSLog("Mac2Seven couldn't save a screenshot to \(url.path): \(error)")
+        }
+    }
+
+    func showInFinder(_ shot: SnipShot) {
+        if let file = shot.file { NSWorkspace.shared.activateFileViewerSelecting([file]) }
+        hideThumbnail()
+    }
+
+    /// Moves the saved file to the Trash.
+    func delete(_ shot: SnipShot) {
+        if let file = shot.file {
+            NSWorkspace.shared.recycle([file]) { _, error in if error != nil { NSSound.beep() } }
+            shot.file = nil
+        }
+        hideThumbnail()
+    }
+
+    func hideThumbnail() {
+        thumbnailHide?.cancel()
+        thumbnailPanel?.orderOut(nil)
     }
 
     private static let nameFormat: DateFormatter = {
@@ -498,8 +580,9 @@ final class SnipController {
         panel.orderFrontRegardless()
     }
 
-    private func showThumbnail(_ image: NSImage, file: URL?) {
+    private func showThumbnail(_ shot: SnipShot) {
         thumbnailHide?.cancel()
+        let image = shot.image
         let width: CGFloat = 220
         let aspect = image.size.height / max(image.size.width, 1)
         let height = min(max(width * aspect, 60), 260)
@@ -510,17 +593,27 @@ final class SnipController {
             thumbnailPanel = p
             return p
         }()
-        let view = SnipThumbnail(image: image) { [weak self] in
-            if let file { NSWorkspace.shared.activateFileViewerSelecting([file]) }
-            self?.thumbnailPanel?.orderOut(nil)
-        }
+        let view = SnipThumbnail(controller: self, shot: shot)
         panel.contentView = FirstClickHostingView(rootView: view)
         let f = screenUnderMouse().frame
         panel.setFrame(NSRect(x: f.maxX - width - 24, y: f.minY + max(bottomInset(), 0) + 20, width: width, height: height),
                        display: true)
         panel.orderFrontRegardless()
-        let hide = DispatchWorkItem { [weak self] in self?.thumbnailPanel?.orderOut(nil) }
+        scheduleThumbnailHide(after: 5)
+    }
+
+    /// Hides the thumbnail later, but not while its menu is open or the pointer is on it.
+    private func scheduleThumbnailHide(after seconds: Double) {
+        let hide = DispatchWorkItem { [weak self] in
+            guard let self, let panel = self.thumbnailPanel else { return }
+            let menuOpen = RunLoop.current.currentMode == .eventTracking
+            if menuOpen || NSMouseInRect(NSEvent.mouseLocation, panel.frame, false) {
+                self.scheduleThumbnailHide(after: 1)
+            } else {
+                panel.orderOut(nil)
+            }
+        }
         thumbnailHide = hide
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: hide)
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: hide)
     }
 }

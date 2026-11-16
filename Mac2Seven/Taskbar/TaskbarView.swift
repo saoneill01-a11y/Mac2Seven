@@ -313,6 +313,7 @@ struct TaskButtonView: View {
     let actions: TaskbarActions
     @EnvironmentObject var tracker: WindowTracker
     @EnvironmentObject var prefs: Preferences
+    @EnvironmentObject var library: Library
     @EnvironmentObject var hover: HoverModel
     @Environment(\.taskbarAccent) private var accent
     @State private var frame = NSRect.zero
@@ -438,6 +439,11 @@ struct TaskButtonView: View {
             Button("Unpin from Taskbar") { prefs.data.taskbar.pinned.removeAll { $0 == app.path } }
         } else {
             Button("Pin to Taskbar") { prefs.data.taskbar.pinned.append(app.path) }
+        }
+        if library.isPinned(app.path) {
+            Button("Unpin from Start Menu") { library.unpin(app.path) }
+        } else {
+            Button("Pin to Start Menu") { library.pin(app.path) }
         }
         if let window = button.window {
             Divider()

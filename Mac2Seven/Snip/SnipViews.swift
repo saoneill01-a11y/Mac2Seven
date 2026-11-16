@@ -162,13 +162,14 @@ struct SnipCountdown: View {
     }
 }
 
-/// A small preview of the capture in the corner; click it to show the file in Finder.
+/// A small preview of the capture in the corner. Click it to open it in Preview (or show the saved file
+/// in Finder); right-click it for more.
 struct SnipThumbnail: View {
-    let image: NSImage
-    let onClick: () -> Void
+    let controller: SnipController
+    let shot: SnipShot
 
     var body: some View {
-        Image(nsImage: image)
+        Image(nsImage: shot.image)
             .resizable()
             .aspectRatio(contentMode: .fill)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -176,7 +177,25 @@ struct SnipThumbnail: View {
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Color.white.opacity(0.6), lineWidth: 2))
             .contentShape(Rectangle())
-            .onTapGesture(perform: onClick)
-            .help("Show in Finder")
+            .onTapGesture {
+                if shot.file != nil { controller.showInFinder(shot) } else { controller.openInPreview(shot); controller.hideThumbnail() }
+            }
+            .contextMenu {
+                Button("Open in Preview") { controller.openInPreview(shot); controller.hideThumbnail() }
+                Button("Copy to Clipboard") { controller.copy(shot) }
+                Divider()
+                Button("Save to Photos") { controller.saveToPhotos(shot) }
+                Button("Save to Desktop") { controller.save(shot, to: .desktopDirectory) }
+                Button("Save to Documents") { controller.save(shot, to: .documentDirectory) }
+                Button("Save As…") { controller.saveAs(shot) }
+                if shot.file != nil {
+                    Divider()
+                    Button("Show in Finder") { controller.showInFinder(shot) }
+                    Button("Move to Trash") { controller.delete(shot) }
+                }
+                Divider()
+                Button("Close") { controller.hideThumbnail() }
+            }
+            .help(shot.file != nil ? "Click to show in Finder, right-click for more" : "Click to open in Preview, right-click for more")
     }
 }

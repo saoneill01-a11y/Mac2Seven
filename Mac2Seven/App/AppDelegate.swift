@@ -44,7 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let fileSearch = FileSearch()
     let prefs = Preferences()
     let updater = UpdaterModel()
-    private(set) lazy var taskbar = TaskbarController(prefs: prefs)
+    private(set) lazy var taskbar = TaskbarController(prefs: prefs, library: library)
     private(set) lazy var snip = SnipController(prefs: prefs)
     private var snipHotKey: HotKey?
 

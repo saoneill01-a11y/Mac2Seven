@@ -284,6 +284,11 @@ struct AppContextMenu: View {
         } else {
             Button("Pin to Start Menu") { library.pin(path) }
         }
+        if prefs.data.taskbar.pinned.contains(path) {
+            Button("Unpin from Taskbar") { prefs.data.taskbar.pinned.removeAll { $0 == path } }
+        } else {
+            Button("Pin to Taskbar") { prefs.data.taskbar.pinned.append(path) }
+        }
         if !library.isPinned(path), library.data.usage[path] != nil {
             Button("Remove from This List") { library.forget(path) }
         }

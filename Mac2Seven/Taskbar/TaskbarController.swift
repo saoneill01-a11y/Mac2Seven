@@ -36,6 +36,29 @@ final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
     @MainActor required dynamic init?(coder: NSCoder) { fatalError("not used") }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// On the taskbar, right-click menus open above the bar (like Windows) instead of at the pointer,
+    /// where they would cover the bar.
+    var opensMenusAbove = false
+
+    override func rightMouseDown(with event: NSEvent) {
+        if !popUpMenuAbove(for: event) { super.rightMouseDown(with: event) }
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control), popUpMenuAbove(for: event) { return }
+        super.mouseDown(with: event)
+    }
+
+    private func popUpMenuAbove(for event: NSEvent) -> Bool {
+        guard opensMenusAbove, let menu = menu(for: event), !menu.items.isEmpty else { return false }
+        let local = convert(event.locationInWindow, from: nil)
+        // With no positioning item the point is the menu's top-left corner, so lift it by the menu's height.
+        let gap: CGFloat = 6
+        let y = isFlipped ? -menu.size.height - gap : bounds.maxY + menu.size.height + gap
+        menu.popUp(positioning: nil, at: NSPoint(x: local.x, y: y), in: self)
+        return true
+    }
 }
 
 /// Owns the taskbar windows (one per display), the preview popup, and the window tracker.
@@ -44,6 +67,7 @@ final class TaskbarController {
     let tracker = WindowTracker()
     let thumbnails = Thumbnails()
     private let prefs: Preferences
+    private let library: Library
     private let previewModel = PreviewModel()
     private let hoverModel = HoverModel()
     /// Where each hoverable element is on screen, keyed by its id.
@@ -71,8 +95,9 @@ final class TaskbarController {
     var onOpenSettings: () -> Void = {}
     var onSnip: () -> Void = {}
 
-    init(prefs: Preferences) {
+    init(prefs: Preferences, library: Library) {
         self.prefs = prefs
+        self.library = library
     }
 
     func start() {
@@ -177,10 +202,12 @@ final class TaskbarController {
             barHovers.append(barHover)
             let view = TaskbarView(barFrame: frame, actions: actions(for: index))
                 .environmentObject(prefs)
+                .environmentObject(library)
                 .environmentObject(tracker)
                 .environmentObject(barHover)
             let host = FirstClickHostingView(rootView: view)
             host.frame = NSRect(origin: .zero, size: frame.size)
+            host.opensMenusAbove = true
             panel.contentView = host
             panel.setFrame(frame, display: true)
             panel.orderFrontRegardless()
