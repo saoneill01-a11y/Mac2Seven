@@ -72,10 +72,10 @@ struct LeftColumn: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: state.showingAll ? "arrowtriangle.left.fill" : "arrowtriangle.right.fill")
-                    .font(.system(size: 9))
+                    .scaledFont(size: 9)
                     .foregroundStyle(p.arrowTint)
                 Text(state.showingAll ? "Back" : "All Programs")
-                    .font(.system(size: 13, weight: .medium))
+                    .scaledFont(size: 13, weight: .medium)
                     .foregroundStyle(p.text)
                 if !state.showingAll && hasNewApps {
                     NewBadge()
@@ -94,7 +94,7 @@ struct LeftColumn: View {
         HStack(spacing: 6) {
             TextField("Search programs and files", text: $state.query)
                 .textFieldStyle(.plain)
-                .font(.system(size: 13))
+                .scaledFont(size: 13)
                 .focused($searchFocused)
                 .onSubmit {
                     let list = hits
@@ -173,7 +173,7 @@ struct HomeListView: View {
                     EmptyView()
                 } else if frequent.isEmpty {
                     Text("Apps you open will show up here.")
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .foregroundStyle(.secondary)
                         .padding(10)
                 } else {
@@ -205,6 +205,7 @@ struct AppRow: View {
     @EnvironmentObject var state: MenuState
     @Environment(\.palette) private var p
 
+    @Environment(\.textScale) private var scale
     private var hoverKey: String { "app:" + item.path }
     private var highlighted: Bool { selected || (state.hoveredID == hoverKey && !state.isDragging) }
 
@@ -213,9 +214,9 @@ struct AppRow: View {
             Image(nsImage: IconCache.icon(item.path))
                 .resizable()
                 .interpolation(.high)
-                .frame(width: iconSize, height: iconSize)
+                .frame(width: iconSize * scale, height: iconSize * scale)
             Text(item.name)
-                .font(.system(size: iconSize > 20 ? 13 : 12, weight: bold ? .semibold : .regular))
+                .scaledFont(size: iconSize > 20 ? 13 : 12, weight: bold ? .semibold : .regular)
                 .foregroundStyle(p.text)
                 .lineLimit(1)
             if library.isNew(item.path) {
@@ -223,7 +224,7 @@ struct AppRow: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.leading, 6 + indent)
+        .padding(.leading, 6 + indent * scale)
         .padding(.trailing, 6)
         .padding(.vertical, iconSize > 20 ? 3 : 2)
         .background(RowHighlight(active: highlighted))
@@ -253,7 +254,7 @@ struct NewBadge: View {
 
     var body: some View {
         Text("New")
-            .font(.system(size: 9, weight: .bold))
+            .scaledFont(size: 9, weight: .bold)
             .foregroundStyle(.white)
             .padding(.horizontal, 5)
             .padding(.vertical, 1)

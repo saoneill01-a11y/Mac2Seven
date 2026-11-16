@@ -60,6 +60,9 @@ final class StartPanel: NSPanel {
 
         let host = NSHostingView(rootView: content)
         host.frame = NSRect(origin: .zero, size: size)
+        // The window sets the size (the menu can be resized), not the SwiftUI content.
+        host.sizingOptions = []
+        host.autoresizingMask = [.width, .height]
         contentView = host
 
         NotificationCenter.default.addObserver(
@@ -68,6 +71,29 @@ final class StartPanel: NSPanel {
             self?.onDismiss?()
         }
     }
+
+    /// The smallest the menu may be, whatever resizes it.
+    var minimumSize = NSSize(width: 480, height: 460)
+
+    /// Every resize goes through here, so the menu can never get smaller than `minimumSize`.
+    /// The corner that stays put is the one the menu is anchored by (the bottom when it rises from the
+    /// taskbar), so a too-small request keeps that edge where it is.
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        var f = frameRect
+        if f.width < minimumSize.width { f.size.width = minimumSize.width }
+        if f.height < minimumSize.height {
+            if anchoredAtBottom {
+                f.size.height = minimumSize.height
+            } else {
+                f.origin.y = f.maxY - minimumSize.height
+                f.size.height = minimumSize.height
+            }
+        }
+        super.setFrame(f, display: flag)
+    }
+
+    /// True when the menu rises from the taskbar (its bottom edge stays put).
+    var anchoredAtBottom = false
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }

@@ -292,7 +292,8 @@ final class Library: ObservableObject {
 
         for app in added where !data.hidden.contains(app.path) && !Self.looksLikeHelper(app.name)
             && folderContaining(app.path) == nil {
-            if let key = Self.developerKey(app.bundleID), let folder = folderForDeveloper(key) {
+            let key = Self.developerKey(app.bundleID) ?? (Self.isApple(app) ? Self.appleKey : nil)
+            if let key, let folder = folderForDeveloper(key) {
                 move([app.path], to: folder)
             }
         }
@@ -307,6 +308,29 @@ final class Library: ObservableObject {
         let parts = id.split(separator: ".")
         guard parts.count >= 3 else { return nil }
         return parts[0] + "." + parts[1]
+    }
+
+    // MARK: Apple folder
+
+    /// Apple's apps aren't suggested by developer (there are too many); the Apple folder is its own option.
+    static let appleKey = "com.apple"
+
+    static func isApple(_ app: AppItem) -> Bool {
+        app.bundleID?.lowercased().hasPrefix("com.apple.") ?? false
+    }
+
+    /// Apple apps that aren't hidden and aren't in any folder yet.
+    func unfiledAppleApps(from apps: [AppItem], autoHide: Bool) -> [AppItem] {
+        apps.filter { Self.isApple($0) && !isHidden($0, autoHide: autoHide) && folderContaining($0.path) == nil }
+    }
+
+    /// Moves the apps into the Apple folder (making it if needed); new Apple apps then go there automatically.
+    func moveToAppleFolder(_ apps: [AppItem]) {
+        let id = folderForDeveloper(Self.appleKey)
+            ?? data.folders.first { $0.name.caseInsensitiveCompare("Apple") == .orderedSame }?.id
+            ?? addFolder(parent: nil, name: "Apple")
+        _ = Self.mutate(&data.folders, id: id) { $0.developer = Self.appleKey }
+        move(apps.map(\.path), to: id)
     }
 
     static let knownDevelopers: [String: String] = [

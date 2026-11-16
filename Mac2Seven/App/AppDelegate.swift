@@ -14,7 +14,29 @@ struct Mac2SevenApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    static let panelSize = NSSize(width: 580, height: 620)
+    static let defaultPanelSize = NSSize(width: 580, height: 620)
+    static let minPanelSize = NSSize(width: 480, height: 460)
+    /// The Start menu's size (it can be resized), kept within the screen the mouse is on.
+    var panelSize: NSSize { panelSize(fromBottom: false) }
+
+    /// The saved size, made to fit the screen the mouse is on: below the menu bar and above the taskbar
+    /// (opened from the menu bar), or between the taskbar and the menu bar (opened from the taskbar).
+    func panelSize(fromBottom: Bool) -> NSSize {
+        let mouse = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
+        let visible = screen.visibleFrame
+        let floor = (taskbarTop(on: screen) ?? visible.minY) + 8
+        let maxHeight = fromBottom ? visible.maxY - floor - 8 : visible.maxY - 6 - floor
+        return NSSize(width: min(max(prefs.data.menuWidth, Self.minPanelSize.width), visible.width - 16),
+                      height: min(max(prefs.data.menuHeight, Self.minPanelSize.height), maxHeight))
+    }
+
+    /// The top edge of the taskbar on this screen, if one is showing there.
+    private func taskbarTop(on screen: NSScreen) -> CGFloat? {
+        let t = prefs.data.taskbar
+        guard t.enabled, t.allDisplays || screen == NSScreen.screens.first else { return nil }
+        return screen.frame.minY + taskbar.barHeight
+    }
 
     let catalog = AppCatalog()
     let library = Library()
@@ -50,7 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .environmentObject(menuState)
             .environmentObject(fileSearch)
             .environmentObject(prefs)
-        panel = StartPanel(size: Self.panelSize, content: root)
+        panel = StartPanel(size: panelSize, content: root)
+        menuState.resizeHandler = { [weak self] step in self?.resizeMenu(step) }
         panel.onDismiss = { [weak self] in self?.closePanel() }
 
         setUpStatusItem()
@@ -63,50 +86,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         installKeyMonitor()
         setUpTaskbar()
+        Dock.rehideAtLaunch(taskbarOn: prefs.data.taskbar.enabled)
         setUpSnip()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.showRecoveryNoticeIfNeeded() }
 
         #if DEBUG
-        // Debug only: --demo --taskbar stages the taskbar with the Start menu and calendar open.
-        if DemoMode.isOn, CommandLine.arguments.contains("--taskbar") {
-            showDemoBackdrop()
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                self.taskbar.stageDemo()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.panel.makeFirstResponder(nil) }
-            }
-            return
-        }
-        // Debug only: --demo [--all] stages the menu for marketing screenshots.
-        if DemoMode.isOn {
-            showDemoBackdrop()
-            let all = CommandLine.arguments.contains("--all")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                self.openPanel()
-                self.menuState.showingAll = all
-                // Centered on screen, away from the menu bar.
-                if let screen = NSScreen.main {
-                    let f = screen.frame
-                    self.panel.setFrameOrigin(NSPoint(x: f.midX - Self.panelSize.width / 2,
-                                                      y: f.midY - Self.panelSize.height / 2))
-                }
-                // No text cursor in the search box.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.panel.makeFirstResponder(nil) }
-            }
-            return
-        }
-        // Debug only: --settings [tab]
-        if let i = CommandLine.arguments.firstIndex(of: "--settings") {
-            let args = CommandLine.arguments
-            let tab = i + 1 < args.count && !args[i + 1].hasPrefix("--") ? args[i + 1] : "general"
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.openSettings(tab: tab) }
-        }
         // Debug only: --hover-report writes the bars' Start buttons and hover state to a file every half second.
         if let i = CommandLine.arguments.firstIndex(of: "--hover-report"), i + 1 < CommandLine.arguments.count {
             let path = CommandLine.arguments[i + 1]
             Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
                 Task { @MainActor in
                     let starts = self.taskbar.startButtonRects().map { "\(Int($0.midX)),\(Int($0.midY))" }.joined(separator: " ")
-                    try? "starts \(starts)\nhover \(self.taskbar.hoverState())\n".write(toFile: path, atomically: true, encoding: .utf8)
+                    try? "starts \(starts)\nhover \(self.taskbar.hoverState())\nbuttons \(self.taskbar.buttonCentres())\n"
+                        .write(toFile: path, atomically: true, encoding: .utf8)
                 }
             }
         }
@@ -134,6 +126,72 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         self.snip.debugMoveTest(report: args[j + 1])
                     }
                 }
+            }
+        }
+        // Debug only: --demo --taskbar stages the taskbar with the Start menu and calendar open.
+        if DemoMode.isOn, CommandLine.arguments.contains("--taskbar") {
+            showDemoBackdrop()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                self.taskbar.stageDemo()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.panel.makeFirstResponder(nil) }
+            }
+            return
+        }
+        // Debug only: --demo [--all] stages the menu for marketing screenshots.
+        if DemoMode.isOn {
+            showDemoBackdrop()
+            let all = CommandLine.arguments.contains("--all")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                self.openPanel()
+                self.menuState.showingAll = all
+                // Centered on screen, away from the menu bar.
+                if let screen = NSScreen.main {
+                    let f = screen.frame
+                    self.panel.setFrameOrigin(NSPoint(x: f.midX - self.panelSize.width / 2,
+                                                      y: f.midY - self.panelSize.height / 2))
+                }
+                // No text cursor in the search box.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { self.panel.makeFirstResponder(nil) }
+            }
+            return
+        }
+        // Debug only: --settings [tab]
+        if let i = CommandLine.arguments.firstIndex(of: "--settings") {
+            let args = CommandLine.arguments
+            let tab = i + 1 < args.count && !args[i + 1].hasPrefix("--") ? args[i + 1] : "general"
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.openSettings(tab: tab) }
+        }
+        // Debug only: --text-while-closed opens All Programs, closes the menu, changes the text size to 140%,
+        // then reopens All Programs (as changing the slider in Settings does).
+        if CommandLine.arguments.contains("--text-while-closed") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.openPanel(); self.menuState.showingAll = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    self.closePanel()
+                    self.prefs.data.textScale = 1.4
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.openPanel(); self.menuState.showingAll = true
+                    }
+                }
+            }
+        }
+        // Debug only: --text-cycle changes the Start menu text size live, as dragging its slider does.
+        if CommandLine.arguments.contains("--text-cycle") {
+            let steps: [Double] = [1.0, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.35, 1.3, 1.25, 1.2]
+            var i = 0
+            Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { timer in
+                Task { @MainActor in
+                    guard i < steps.count else { timer.invalidate(); return }
+                    self.prefs.data.textScale = steps[i]
+                    i += 1
+                }
+            }
+        }
+        // Debug only: --organize-apple runs Settings → Organize's "Move to Apple" (after the first app scan).
+        if CommandLine.arguments.contains("--organize-apple") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                let apps = self.library.unfiledAppleApps(from: self.catalog.apps, autoHide: self.prefs.data.autoHideHelpers)
+                self.library.moveToAppleFolder(apps)
             }
         }
         if CommandLine.arguments.contains("--calendar") {
@@ -299,6 +357,64 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in self?.settingsWindow?.makeFirstResponder(nil) }
     }
 
+    // MARK: Resizing the menu
+
+    private var resizeStart: (mouse: NSPoint, frame: NSRect)?
+
+    /// Drags the menu's grip: from the taskbar the bottom-left corner stays put (it grows up and right);
+    /// from the menu bar the top-left corner stays put (it grows down and right).
+    private func resizeMenu(_ step: MenuState.ResizeStep) {
+        switch step {
+        case .began(let moved):
+            // Measure from where the press started, not where the drag was first noticed.
+            // (SwiftUI's y grows downward; the screen's grows upward.)
+            let now = NSEvent.mouseLocation
+            resizeStart = (NSPoint(x: now.x - moved.width, y: now.y + moved.height), panel.frame)
+        case .changed:
+            guard let start = resizeStart else { return }
+            let mouse = NSEvent.mouseLocation
+            let screen = panel.screen ?? NSScreen.main ?? NSScreen.screens[0]
+            let visible = screen.visibleFrame
+            let floor = (taskbarTop(on: screen) ?? visible.minY) + 8
+            let s = start.frame
+            let minSize = Self.minPanelSize
+            // Never cap below the current size, so the menu doesn't jump when a drag starts.
+            let maxWidth = max(visible.maxX - s.minX - 8, s.width)
+            let width = max(min(s.width + mouse.x - start.mouse.x, maxWidth), minSize.width)
+            var frame: NSRect
+            if menuState.fromBottom {
+                let maxHeight = max(visible.maxY - s.minY - 8, s.height)
+                let height = max(min(s.height + mouse.y - start.mouse.y, maxHeight), minSize.height)
+                frame = NSRect(x: s.minX, y: s.minY, width: width, height: height)
+            } else {
+                // Growing downward stops above the taskbar.
+                let maxHeight = max(s.maxY - floor, s.height)
+                let height = max(min(s.height - (mouse.y - start.mouse.y), maxHeight), minSize.height)
+                frame = NSRect(x: s.minX, y: s.maxY - height, width: width, height: height)
+            }
+            panel.setFrame(frame, display: true)
+        case .ended:
+            resizeMenu(.changed) // follow the pointer to where it was let go
+            resizeStart = nil
+            prefs.data.menuWidth = panel.frame.width
+            prefs.data.menuHeight = panel.frame.height
+            panel.invalidateShadow()
+        case .reset:
+            let old = panel.frame
+            let size = Self.defaultPanelSize
+            let y = menuState.fromBottom ? old.minY : old.maxY - size.height
+            panel.setFrame(NSRect(x: old.minX, y: y, width: size.width, height: size.height), display: true)
+            prefs.data.menuWidth = size.width
+            prefs.data.menuHeight = size.height
+            panel.invalidateShadow()
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        // If Mac2Seven hid the Dock for the taskbar, don't leave the Mac without either.
+        Dock.restoreForQuit()
+    }
+
     // MARK: Snip
 
     private func setUpSnip() {
@@ -346,11 +462,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             closePanel()
             return
         }
-        let size = Self.panelSize
+        let size = panelSize(fromBottom: true)
         let screen = NSScreen.screens.first { $0.frame.intersects(button) } ?? NSScreen.main ?? NSScreen.screens[0]
         let f = screen.frame
+        let visible = screen.visibleFrame
         let x = prefs.data.taskbar.alignment == .left ? button.minX : button.minX - 8
-        let origin = NSPoint(x: min(max(x, f.minX + 8), f.maxX - size.width - 8),
+        // Keep it clear of a Dock on the side, too.
+        let origin = NSPoint(x: min(max(x, visible.minX + 8), visible.maxX - size.width - 8),
                              y: f.minY + taskbar.barHeight + 8)
         openPanel(at: origin, fromBottom: true)
     }
@@ -381,22 +499,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         catalog.refresh()
         menuState.reset()
         menuState.fromBottom = fromBottom
+        panel.anchoredAtBottom = fromBottom
         taskbar.hidePreviewNow()
-        panel.setFrameOrigin(origin ?? panelOrigin())
+        panel.setFrame(NSRect(origin: origin ?? panelOrigin(), size: panelSize(fromBottom: fromBottom)), display: false)
         panel.makeKeyAndOrderFront(nil)
         panel.invalidateShadow()
     }
 
     func closePanel() {
         guard panel.isVisible else { return }
+        rememberMenuSize()
         panel.orderOut(nil)
         lastClose = Date()
+    }
+
+    /// Saves the menu's current size, so it reopens the same however the resize ended.
+    private func rememberMenuSize() {
+        resizeStart = nil
+        let size = panel.frame.size
+        guard size.width >= Self.minPanelSize.width, size.height >= Self.minPanelSize.height else { return }
+        if abs(prefs.data.menuWidth - size.width) > 0.5 { prefs.data.menuWidth = size.width }
+        if abs(prefs.data.menuHeight - size.height) > 0.5 { prefs.data.menuHeight = size.height }
     }
 
     /// Opens under the menu bar icon on the screen the mouse is on. On other displays it sits the same
     /// distance from the right edge as the icon does on its own screen.
     private func panelOrigin() -> NSPoint {
-        let size = Self.panelSize
+        let size = panelSize
         let mouse = NSEvent.mouseLocation
         let target = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main ?? NSScreen.screens[0]
         let visible = target.visibleFrame

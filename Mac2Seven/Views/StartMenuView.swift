@@ -82,6 +82,34 @@ struct Palette {
     }
 }
 
+private struct TextScaleKey: EnvironmentKey { static let defaultValue: Double = 1 }
+
+extension EnvironmentValues {
+    /// The Text size setting, applied by `scaledFont`.
+    var textScale: Double {
+        get { self[TextScaleKey.self] }
+        set { self[TextScaleKey.self] = newValue }
+    }
+}
+
+/// A system font whose size follows the Text size setting.
+private struct ScaledFont: ViewModifier {
+    @Environment(\.textScale) private var scale
+    let size: CGFloat
+    let weight: Font.Weight
+    let design: Font.Design
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: (size * scale).rounded(), weight: weight, design: design))
+    }
+}
+
+extension View {
+    func scaledFont(size: CGFloat, weight: Font.Weight = .regular, design: Font.Design = .default) -> some View {
+        modifier(ScaledFont(size: size, weight: weight, design: design))
+    }
+}
+
 private struct PaletteKey: EnvironmentKey {
     static let defaultValue = Palette(style: .glass, dark: false, accent: .blue)
 }
@@ -95,22 +123,29 @@ extension EnvironmentValues {
 
 struct StartMenuView: View {
     @EnvironmentObject var prefs: Preferences
+    @EnvironmentObject var state: MenuState
     /// The system's light/dark setting (nothing above this view overrides it).
     @Environment(\.colorScheme) private var systemScheme
 
     var body: some View {
         let p = Palette.make(prefs, systemDark: systemScheme == .dark)
 
-        HStack(spacing: 0) {
-            LeftColumn()
-                .frame(width: 340)
-                .environment(\.colorScheme, p.leftScheme)
-            RightColumn()
-                .frame(maxWidth: .infinity)
-                .environment(\.colorScheme, p.rightScheme)
+        GeometryReader { geo in
+            HStack(spacing: 0) {
+                // The left column keeps its share of the width as the menu is resized (340 of 580).
+                LeftColumn()
+                    .frame(width: max(300, (geo.size.width - 16) * 0.6))
+                    .environment(\.colorScheme, p.leftScheme)
+                RightColumn()
+                    .frame(maxWidth: .infinity)
+                    .environment(\.colorScheme, p.rightScheme)
+            }
+            .padding(8)
+            .frame(width: geo.size.width, height: geo.size.height)
         }
-        .padding(8)
-        .frame(width: AppDelegate.panelSize.width, height: AppDelegate.panelSize.height)
+        .overlay(alignment: state.fromBottom ? .topTrailing : .bottomTrailing) {
+            ResizeGrip(fromBottom: state.fromBottom, color: p.rightText.opacity(0.55))
+        }
         .background(PanelBackground())
         .clipShape(RoundedRectangle(cornerRadius: p.outerCorner, style: .continuous))
         .overlay(
@@ -118,6 +153,7 @@ struct StartMenuView: View {
                 .strokeBorder(p.outerStroke, lineWidth: 1)
         )
         .environment(\.palette, p)
+        .environment(\.textScale, prefs.data.textScale)
     }
 }
 
@@ -168,5 +204,76 @@ struct RowHighlight: View {
                 RoundedRectangle(cornerRadius: p.rowCorner, style: .continuous)
                     .strokeBorder(active ? p.highlightStroke : .clear, lineWidth: 1)
             )
+    }
+}
+
+/// The corner grip that resizes the menu. Double-click it to go back to the normal size.
+struct ResizeGrip: View {
+    let fromBottom: Bool
+    let color: Color
+    @EnvironmentObject var state: MenuState
+    /// Where the current drag started; a different start means a new drag (even if the last one was
+    /// cancelled and never ended).
+    @State private var dragStart: CGPoint?
+    @State private var cursorPushed = false
+
+    var body: some View {
+        // Three short diagonal lines, slanting toward the corner they sit in.
+        Canvas { ctx, size in
+            for i in 0..<3 {
+                let inset = CGFloat(i) * 4 + 3
+                var line = Path()
+                if fromBottom {
+                    line.move(to: CGPoint(x: inset, y: 1))
+                    line.addLine(to: CGPoint(x: size.width - 1, y: size.height - inset))
+                } else {
+                    line.move(to: CGPoint(x: inset, y: size.height - 1))
+                    line.addLine(to: CGPoint(x: size.width - 1, y: inset))
+                }
+                ctx.stroke(line, with: .color(color), lineWidth: 1.2)
+            }
+        }
+        .frame(width: 14, height: 14)
+        .padding(4)
+        .contentShape(Rectangle())
+        .onHover { inside in
+            if inside && !cursorPushed {
+                resizeCursor.push()
+                cursorPushed = true
+            } else if !inside && cursorPushed {
+                NSCursor.pop()
+                cursorPushed = false
+            }
+        }
+        .onDisappear {
+            // The menu can close with the pointer still on the grip.
+            if cursorPushed {
+                NSCursor.pop()
+                cursorPushed = false
+            }
+        }
+        .onTapGesture(count: 2) { state.resizeHandler(.reset) }
+        .gesture(
+            DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                .onChanged { value in
+                    if dragStart != value.startLocation {
+                        dragStart = value.startLocation
+                        state.resizeHandler(.began(value.translation))
+                    }
+                    state.resizeHandler(.changed)
+                }
+                .onEnded { _ in
+                    dragStart = nil
+                    state.resizeHandler(.ended)
+                }
+        )
+        .help("Drag to resize. Double-click for the normal size.")
+    }
+
+    private var resizeCursor: NSCursor {
+        if #available(macOS 15.0, *) {
+            return NSCursor.frameResize(position: fromBottom ? .topRight : .bottomRight, directions: .all)
+        }
+        return NSCursor.crosshair
     }
 }

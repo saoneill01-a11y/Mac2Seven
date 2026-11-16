@@ -219,6 +219,13 @@ struct AppearanceSettings: View {
                 .labelsHidden()
             }
 
+            Section {
+                TextSizeRow(title: "Start menu", scale: $prefs.data.textScale)
+                TextSizeRow(title: "Taskbar", scale: $prefs.data.taskbarTextScale)
+            } header: {
+                Text("Text size")
+            }
+
             Section("Accent color") {
                 Toggle("Use the macOS accent color", isOn: $prefs.data.useSystemAccent)
                 ColorPicker("Custom color", selection: Binding(
@@ -404,6 +411,7 @@ struct OrganizeSettings: View {
     @EnvironmentObject var catalog: AppCatalog
     @State private var suggestions: [Library.FolderSuggestion] = []
     @State private var chosen: Set<String> = []
+    @State private var appleApps: [AppItem] = []
 
     private var hidden: [AppItem] {
         catalog.apps.filter { library.isHidden($0, autoHide: prefs.data.autoHideHelpers) }
@@ -463,6 +471,31 @@ struct OrganizeSettings: View {
             }
 
             Section {
+                if appleApps.isEmpty {
+                    Text("Every Apple app is already in a folder.").foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(appleApps.map(\.name).sorted().joined(separator: ", "))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack {
+                            Spacer()
+                            Button(appleApps.count == 1 ? "Move 1 App to “Apple”" : "Move \(appleApps.count) Apps to “Apple”") {
+                                library.moveToAppleFolder(appleApps)
+                                refresh()
+                            }
+                        }
+                    }
+                }
+            } header: {
+                Text("Apple apps")
+            } footer: {
+                Text("Moves Apple's own apps (Safari, Mail, Calendar and so on) into an Apple folder in All Programs. Apple apps you've already put in other folders stay where they are. New Apple apps go straight into the Apple folder.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+
+            Section {
                 Toggle("Hide helpers, installers and uninstallers automatically", isOn: $prefs.data.autoHideHelpers)
             } footer: {
                 Text("Apps whose names include Helper, Service, Server, Agent, Shim, Updater, Installer or Uninstaller, or start with Remove, go to the Hidden folder at the bottom of All Programs. Apps you've pinned, put in a folder or unhidden are never hidden. Search still finds hidden apps.")
@@ -495,6 +528,7 @@ struct OrganizeSettings: View {
     private func refresh() {
         suggestions = library.suggestions(from: catalog.apps, autoHide: prefs.data.autoHideHelpers)
         chosen = Set(suggestions.map(\.id))
+        appleApps = library.unfiledAppleApps(from: catalog.apps, autoHide: prefs.data.autoHideHelpers)
     }
 }
 
@@ -576,6 +610,32 @@ struct HistorySettings: View {
             Button("Clear History", role: .destructive) { library.clearHistory() }
         } message: {
             Text("Apps will reappear as you use them. This can't be undone.")
+        }
+    }
+}
+
+/// One text-size slider with its percentage and a Reset button.
+private struct TextSizeRow: View {
+    let title: String
+    @Binding var scale: Double
+
+    var body: some View {
+        // A fixed-width title and a control that fills the rest, so both sliders start and end in the same place.
+        LabeledContent {
+            HStack(spacing: 10) {
+                Text("A").font(.system(size: 11))
+                Slider(value: $scale, in: 0.8...1.5, step: 0.05)
+                Text("A").font(.system(size: 18))
+                Text("\(Int((scale * 100).rounded()))%")
+                    .monospacedDigit()
+                    .frame(width: 44, alignment: .trailing)
+                Button("Reset") { scale = 1 }
+                    .disabled(scale == 1)
+            }
+            .frame(maxWidth: .infinity)
+        } label: {
+            Text(title)
+                .frame(width: 90, alignment: .leading)
         }
     }
 }

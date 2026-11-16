@@ -13,15 +13,16 @@ A menu bar app launcher with a classic two-column Start-menu layout, plus an opt
 - **Pinned apps:** right-click any app → *Pin to Start Menu*, or drag an app (from the menu or Finder) onto the list. Drag pinned apps up or down to reorder them; a blue line shows where they'll land.
 - **Frequently used:** fills in automatically from the apps you launch.
 - **All Programs:** make folders (and subfolders), then drag apps anywhere into a folder (its title or, when open, anywhere in its contents) or use right-click → *Move to Folder*. Drag apps up or down to reorder them, at the top level or inside a folder. Drag a folder onto another folder's title to put it above or below; drop it inside an open folder to make it a subfolder, or on empty space to move it back to the top level. Hovering a closed folder while dragging opens it. Right-click a folder to rename or delete it.
+- **Resize:** drag the grip in the menu's corner (bottom-right, or top-right when opened from the taskbar); double-click it for the normal size. The size is remembered.
 - **Search:** just start typing. Use ↑/↓ to pick a result and Return to open it. Esc clears the search, then closes the menu.
 - **Right-click the menu bar icon** for Take Screenshot, Settings, Show Data Folder, and Quit. New apps appear automatically: the menu rescans your app folders every time it opens.
 - **Settings** (right-click → Settings…, or ⌘, while the menu is open):
   - *General:* Launch at Login, the shortcut that opens the menu, and what the power button does.
   - *Taskbar:* turn the taskbar on and set it up (see [Taskbar](#taskbar) below).
   - *Screenshots:* the Snip shortcut, save folder and what happens after a capture (see [Snip](#snip-screenshots) below).
-  - *Appearance:* Light / Dark / Match System, the Glass or Flat theme, and the accent color.
+  - *Appearance:* text size, Light / Dark / Match System, the Glass or Flat theme, and the accent color.
   - *Places:* edit the right-hand column (add folders or apps, separators, rename, reorder), and switch Documents/Pictures/Desktop to your OneDrive folders in one click.
-  - *Organize:* suggests folders by developer (Microsoft, Autodesk…) and creates them in one click; after that, new apps from those developers file themselves. Also controls auto-hiding of helpers and lists hidden apps.
+  - *Organize:* suggests folders by developer (Microsoft, Autodesk…) and creates them in one click; after that, new apps from those developers file themselves. It can also move Apple's own apps into an Apple folder. Also controls auto-hiding of helpers and lists hidden apps.
   - *History:* how many frequently used apps to show, and Clear History.
   - *Backup:* export your layout (pins, folders, hidden apps, places, appearance) to a file — e.g. in OneDrive — and import it later or on another Mac. Importing saves your current layout to the data folder first.
 - **About Mac2Seven** and **Check for Updates…** are in the menu bar icon's right-click menu.
@@ -43,7 +44,9 @@ Turn it on in **Settings → Taskbar**. It runs along the bottom of the screen (
 - **Button styles:** *Combine (icons only)*, *Combine (with app names)* — one button per app with its name and a window count — or *Never combine (window titles)*, one labeled button per window.
 - **Layout:** 1 to 3 rows, centered or left-aligned. When the bar fills up, labels get narrower, then apps with several windows combine into one button (biggest first), and anything left goes into a **⌃** menu at the end of the bar.
 - **Show desktop:** the thin strip at the far right hides every app; click again to bring them back. The clock beside it opens Calendar.
-- **Keep windows clear of the taskbar** (on by default) shortens a window whose bottom edge goes behind the bar. **Hide the Dock** turns on the Dock's auto-hide so it doesn't cover the taskbar.
+- **Keep windows clear of the taskbar** (on by default) shortens a window whose bottom edge goes behind the bar. **Hide the Dock** keeps the Dock from popping up over the taskbar; it comes back whenever Mac2Seven isn't running.
+- **Reorder:** drag any button, pinned or not, along the taskbar; a blue line shows where it will land. The order is remembered. With a button per window, drag a window between its app's other windows to reorder them.
+- **Open apps** sit on a tile with a border, and the app in front on a stronger one. Apps that are running with no window open keep only their dot.
 - **Pinned apps:** pin from a button's right-click menu, or add, reorder and remove them in Settings → Taskbar.
 
 The taskbar needs two permissions; Settings → Taskbar shows whether each is allowed and has buttons to ask for them:
@@ -76,7 +79,7 @@ To sign it, select your team under the target's *Signing & Capabilities* tab (it
 
 The app icon is drawn by `Tools/make-icon.swift`; run `swift Tools/make-icon.swift` from the repo root to regenerate it.
 
-Debug-build launch flags (not in Release builds): `--data-dir <path>`, which reads and writes `library.json` and `settings.json` in that folder instead of your real ones, `--calendar` (opens the taskbar clock's calendar), `--snip [rectangle|window|fullScreen|freeform]` with `--snip-auto` (captures a sample) or `--snip-sample` (shows a sample selection), `--test-bars N` (N taskbars stacked on one display, for testing several displays) with `--hover-report <file>`, `--open` (add `--bottom` for the taskbar layout), `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`, `--demo [--all]`, and `--demo --taskbar` (the taskbar with the Start menu and calendar open), which stages the menu with sample content for screenshots like the ones in `Marketing/`.
+Debug-build launch flags (not in Release builds): `--data-dir <path>`, which reads and writes `library.json` and `settings.json` in that folder instead of your real ones, `--calendar` (opens the taskbar clock's calendar), `--snip [rectangle|window|fullScreen|freeform]` with `--snip-auto` (captures a sample) or `--snip-sample` (shows a sample selection), `--test-bars N` (N taskbars stacked on one display, for testing several displays) with `--hover-report <file>` (also lists each app button's position), `--open` (add `--bottom` for the taskbar layout), `--open --query text`, `--open --all`, `--settings [general|appearance|places|organize|history]`, `--demo [--all]`, and `--demo --taskbar` (the taskbar with the Start menu and calendar open), which stages the menu with sample content for screenshots like the ones in `Marketing/`.
 
 ## Releasing a new version
 1. Bump `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` in `project.yml` (the build number must always go up).

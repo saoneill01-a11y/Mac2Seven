@@ -13,6 +13,12 @@ final class HoverModel: ObservableObject {
     @Published var hoveredID: String?
     @Published var previewCard: CGWindowID?
     @Published var previewClose = false
+    /// The app whose button is being dragged to a new place, and where the drop line goes (bar coordinates,
+    /// origin top-left).
+    @Published var draggingPath: String?
+    /// Set when one window's button (window titles mode) is being dragged, rather than the whole app.
+    @Published var draggingWindow: CGWindowID?
+    @Published var dropLine: CGRect?
 }
 
 /// Callbacks from the taskbar view to its controller.
@@ -20,7 +26,9 @@ struct TaskbarActions {
     var start: (NSRect) -> Void
     /// Records where a hoverable element is on screen (the controller tracks the pointer itself, because
     /// SwiftUI hover events don't arrive in a panel of a background app).
-    var register: (String, PreviewTarget?, NSRect) -> Void
+    /// The UUID identifies the view doing the registering: a view leaving the bar only removes its own
+    /// entry, never one a newer copy of the same button has already made.
+    var register: (String, PreviewTarget?, NSRect, UUID) -> Void
     var showPreview: (PreviewTarget, NSRect) -> Void
     var hidePreview: () -> Void
     var openSettings: () -> Void
@@ -28,6 +36,13 @@ struct TaskbarActions {
     var calendar: (NSRect) -> Void
     /// Starts Mac2Seven Snip.
     var snip: () -> Void
+    /// A button is being dragged: the app's path, the window when it's one window's button, and the
+    /// pointer (screen coordinates).
+    var dragMoved: (String, CGWindowID?, NSPoint) -> Void
+    /// The drag ended at this point; the controller saves the new order if it's over the bar.
+    var dragEnded: (String, CGWindowID?, NSPoint) -> Void
+    /// The dragged button went away before the drag ended.
+    var dragCancelled: () -> Void
 }
 
 struct TaskbarView: View {
@@ -77,12 +92,15 @@ struct TaskbarView: View {
             Button("Taskbar Settings…") { actions.openSettings() }
         }
         .environment(\.colorScheme, dark ? .dark : .light)
+        .overlay(alignment: .topLeading) { DropLine() }
         .environment(\.taskbarAccent, prefs.accentColor)
+        .environment(\.textScale, prefs.data.taskbarTextScale)
     }
 
     // MARK: Fitting buttons into the bar
 
     static let iconWidth: CGFloat = 42
+    static let startWidth: CGFloat = 46
     static let maxLabelWidth: CGFloat = 168
     static let minLabelWidth: CGFloat = 104
     static let spacing: CGFloat = 2
@@ -115,7 +133,7 @@ struct TaskbarView: View {
             }
         }
         func widths(_ list: [TaskButton], _ label: CGFloat) -> [CGFloat] {
-            [Self.iconWidth] + list.map { $0.labeled ? label : Self.iconWidth }
+            [Self.startWidth] + list.map { $0.labeled ? label : Self.iconWidth }
         }
         func fitsAll(_ list: [TaskButton], _ label: CGFloat) -> Bool {
             let w = widths(list, label)
@@ -207,20 +225,27 @@ private struct ScreenFrameReader: View {
     var id: String
     var target: PreviewTarget?
     var actions: TaskbarActions
+    @State private var token = UUID()
+    /// Set once this view has left the bar, so a late geometry change can't put its stale entry back.
+    @State private var gone = false
 
     var body: some View {
         GeometryReader { geo in
             let g = geo.frame(in: .global)
             Color.clear
-                .onAppear { update(g) }
+                .onAppear { gone = false; update(g) }
                 .onChange(of: g) { _, new in update(new) }
-                .onDisappear { actions.register(id, nil, .zero) }
+                .onDisappear {
+                    gone = true
+                    actions.register(id, nil, .zero, token)
+                }
         }
     }
 
     private func update(_ g: CGRect) {
+        guard !gone else { return }
         frame = convert(g)
-        actions.register(id, target, frame)
+        actions.register(id, target, frame, token)
     }
 
     private func convert(_ g: CGRect) -> NSRect {
@@ -228,16 +253,32 @@ private struct ScreenFrameReader: View {
     }
 }
 
+/// A taskbar button's background. Open apps get a tile with a border, like the Windows taskbar; the app
+/// in front gets a stronger one. (`primary` is dark on a light taskbar and light on a dark one, so the tile
+/// stands out either way.)
 struct ButtonChrome: View {
     let hovering: Bool
     let pressedLook: Bool
+    var open = false
+
+    private var fill: Double {
+        if pressedLook { return hovering ? 0.16 : 0.13 }
+        if open { return hovering ? 0.11 : 0.075 }
+        return hovering ? 0.09 : 0
+    }
+
+    private var border: Double {
+        if pressedLook { return 0.24 }
+        if open { return 0.16 }
+        return 0
+    }
 
     var body: some View {
         RoundedRectangle(cornerRadius: 5, style: .continuous)
-            .fill(Color.primary.opacity(hovering ? 0.09 : (pressedLook ? 0.06 : 0)))
+            .fill(Color.primary.opacity(fill))
             .overlay(
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
-                    .strokeBorder(Color.primary.opacity(pressedLook ? 0.06 : 0), lineWidth: 1)
+                    .strokeBorder(Color.primary.opacity(border), lineWidth: 1)
             )
     }
 }
@@ -254,8 +295,8 @@ struct StartButton: View {
             Image(nsImage: NSApp.applicationIconImage)
                 .resizable()
                 .interpolation(.high)
-                .frame(width: 30, height: 30)
-                .frame(width: 42, height: 40)
+                .frame(width: 36, height: 36)
+                .frame(width: TaskbarView.startWidth, height: 40)
                 .background(ButtonChrome(hovering: hovering, pressedLook: false))
                 .contentShape(Rectangle())
         }
@@ -291,8 +332,52 @@ struct TaskButtonView: View {
         button.window.map { .window($0.id) } ?? .app(app.path)
     }
 
+    private var hasWindow: Bool { button.window != nil || !app.windows.isEmpty }
+
+    private var isDragged: Bool {
+        if let window = button.window, let dragged = hover.draggingWindow { return dragged == window.id }
+        return hover.draggingPath == app.path && hover.draggingWindow == nil
+    }
+    private static let dragThreshold: CGFloat = 5
+
     var body: some View {
-        Button(action: click) {
+        content
+            // One gesture for both: a press that barely moves is a click; anything more drags the button
+            // to a new place. (A Button would swallow the drag.)
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                    .onChanged { value in
+                        guard !NSEvent.modifierFlags.contains(.control) else { return }
+                        if hypot(value.translation.width, value.translation.height) > Self.dragThreshold {
+                            actions.dragMoved(app.path, button.window?.id, screenPoint(value.location))
+                        }
+                    }
+                    .onEnded { value in
+                        // Control-click opens the context menu; it isn't a click on the button too.
+                        guard !NSEvent.modifierFlags.contains(.control) else { return }
+                        if hypot(value.translation.width, value.translation.height) > Self.dragThreshold {
+                            actions.dragEnded(app.path, button.window?.id, screenPoint(value.location))
+                        } else {
+                            click()
+                        }
+                    }
+            )
+            // The button may leave the bar mid-drag (its window closed, it moved to overflow); SwiftUI then never
+            // ends the gesture, so tell the controller.
+            .onDisappear { if isDragged { actions.dragCancelled() } }
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { click() }
+            .background(ScreenFrameReader(barFrame: barFrame, frame: $frame, id: button.id, target: target, actions: actions))
+            .help(labeled ? "" : app.name)
+            .contextMenu { menu }
+    }
+
+    private func screenPoint(_ p: CGPoint) -> NSPoint {
+        NSPoint(x: barFrame.minX + p.x, y: barFrame.maxY - p.y)
+    }
+
+    private var content: some View {
             HStack(spacing: 8) {
                 Image(nsImage: IconCache.icon(app.path))
                     .resizable()
@@ -300,13 +385,13 @@ struct TaskButtonView: View {
                     .frame(width: labeled ? 24 : 28, height: labeled ? 24 : 28)
                 if labeled {
                     Text(button.window?.title ?? app.name)
-                        .font(.system(size: 12))
+                        .scaledFont(size: 12)
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     if button.appLabel, app.windows.count > 1 {
                         Text("\(app.windows.count)")
-                            .font(.system(size: 10, weight: .semibold))
+                            .scaledFont(size: 10, weight: .semibold)
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(Capsule().fill(Color.primary.opacity(0.12)))
@@ -315,15 +400,12 @@ struct TaskButtonView: View {
             }
             .padding(.horizontal, labeled ? 8 : 6)
             .frame(width: labeled ? labelWidth : TaskbarView.iconWidth, height: 40)
-            .background(ButtonChrome(hovering: hovering, pressedLook: isActive))
+            // Only apps with a window open get a tile. Mac apps keep running with no windows (Finder, Word
+            // after closing the last document); those keep their running dot but no tile.
+            .background(ButtonChrome(hovering: hovering, pressedLook: isActive && hasWindow, open: hasWindow))
             .overlay(alignment: .bottom) { indicator }
-            .opacity(button.window?.minimized == true ? 0.75 : 1)
+            .opacity(isDragged ? 0.4 : (button.window?.minimized == true ? 0.75 : 1))
             .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .background(ScreenFrameReader(barFrame: barFrame, frame: $frame, id: button.id, target: target, actions: actions))
-        .help(labeled ? "" : app.name)
-        .contextMenu { menu }
     }
 
     @ViewBuilder private var indicator: some View {
@@ -391,12 +473,12 @@ struct OverflowButton: View {
     var body: some View {
         Button(action: showMenu) {
             Image(systemName: "chevron.up")
-                .font(.system(size: 13, weight: .semibold))
+                .scaledFont(size: 13, weight: .semibold)
                 .frame(width: TaskbarView.iconWidth, height: 40)
                 .background(ButtonChrome(hovering: hover.hoveredID == "overflow", pressedLook: false))
                 .overlay(alignment: .topTrailing) {
                     Text("\(items.count)")
-                        .font(.system(size: 9, weight: .bold))
+                        .scaledFont(size: 9, weight: .bold)
                         .padding(.horizontal, 4)
                         .background(Capsule().fill(Color.primary.opacity(0.18)))
                         .padding(3)
@@ -481,7 +563,7 @@ struct TrayView: View {
             if showSnip {
                 Button(action: actions.snip) {
                     Image(systemName: "scissors")
-                        .font(.system(size: 15))
+                        .scaledFont(size: 15)
                         .frame(width: 32, height: 40)
                         .background(ButtonChrome(hovering: hover.hoveredID == "snip", pressedLook: false))
                         .contentShape(Rectangle())
@@ -508,7 +590,7 @@ struct TrayView: View {
                     Text(context.date.formatted(date: .omitted, time: .shortened))
                     Text(context.date.formatted(date: .numeric, time: .omitted))
                 }
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .padding(.horizontal, 8)
                 .frame(height: 40)
                 .background(ButtonChrome(hovering: clockHover, pressedLook: false))
@@ -651,11 +733,11 @@ struct PreviewCard: View {
         VStack(spacing: 6) {
             HStack(spacing: 6) {
                 Image(nsImage: IconCache.icon(app.path)).resizable().frame(width: 16, height: 16)
-                Text(window.title).font(.system(size: 12)).lineLimit(1).truncationMode(.tail)
+                Text(window.title).scaledFont(size: 12).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 0)
                 Button(action: onClose) {
                     Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .semibold))
+                        .scaledFont(size: 10, weight: .semibold)
                         .frame(width: 20, height: 20)
                         .background(RoundedRectangle(cornerRadius: 4).fill(closeHover ? Color.red.opacity(0.85) : .clear))
                         .foregroundStyle(closeHover ? .white : .primary)
@@ -679,5 +761,21 @@ struct PreviewCard: View {
         .background(ButtonChrome(hovering: hovering, pressedLook: active))
         .contentShape(Rectangle())
         .onTapGesture(perform: onPick)
+    }
+}
+
+/// The blue line that shows where a dragged button will land.
+private struct DropLine: View {
+    @EnvironmentObject var hover: HoverModel
+    @Environment(\.taskbarAccent) private var accent
+
+    var body: some View {
+        if let line = hover.dropLine {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(accent)
+                .frame(width: 3, height: line.height)
+                .offset(x: line.minX - 1.5, y: line.minY)
+                .allowsHitTesting(false)
+        }
     }
 }

@@ -19,7 +19,7 @@ struct SearchResultsView: View {
                 VStack(alignment: .leading, spacing: 1) {
                     if hits.isEmpty {
                         Text("No items match your search.")
-                            .font(.system(size: 12))
+                            .scaledFont(size: 12)
                             .foregroundStyle(.secondary)
                             .padding(12)
                     }
@@ -44,7 +44,7 @@ struct SearchResultsView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 12, weight: .semibold))
+            .scaledFont(size: 12, weight: .semibold)
             .foregroundStyle(p.sectionHeader)
             .padding(.horizontal, 6)
             .padding(.top, 6)
@@ -76,11 +76,11 @@ struct FileRow: View {
                 .frame(width: 24, height: 24)
             VStack(alignment: .leading, spacing: 0) {
                 Text(url.lastPathComponent)
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(p.text)
                     .lineLimit(1)
                 Text(url.deletingLastPathComponent().path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
-                    .font(.system(size: 10))
+                    .scaledFont(size: 10)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
@@ -183,7 +183,7 @@ struct PlaceRow: View {
 
     var body: some View {
         Text(place.title)
-            .font(.system(size: 13, weight: place.bold ? .semibold : .regular))
+            .scaledFont(size: 13, weight: place.bold ? .semibold : .regular)
             .foregroundStyle(p.rightText)
             .shadow(color: p.rightTextShadow, radius: 1, y: 1)
             .lineLimit(1)
@@ -225,7 +225,7 @@ struct PowerButton: View {
                 perform(main)
             } label: {
                 Text(main.title)
-                    .font(.system(size: 12, weight: .medium))
+                    .scaledFont(size: 12, weight: .medium)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 5)
                     .contentShape(Rectangle())
@@ -240,7 +240,7 @@ struct PowerButton: View {
                 }
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .bold))
+                    .scaledFont(size: 10, weight: .bold)
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
