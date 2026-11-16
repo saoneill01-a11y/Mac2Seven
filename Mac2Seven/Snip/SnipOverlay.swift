@@ -216,11 +216,18 @@ final class SnipOverlayView: NSView {
                                                         width: abs(p.x - start.x), height: abs(p.y - start.y))))
             case .move(let offset):
                 NSCursor.closedHand.set()
-                guard let rect = selection else { return }
-                var origin = NSPoint(x: p.x - offset.x, y: p.y - offset.y)
-                origin.x = min(max(origin.x, 0), bounds.width - rect.width)
-                origin.y = min(max(origin.y, 0), bounds.height - rect.height)
-                controller.setSelection((screen, NSRect(origin: origin, size: rect.size)))
+                // The rectangle follows the pointer onto whichever display it's over (macOS keeps sending the
+                // drag to this display's overlay even after the pointer leaves it). A capture comes from one
+                // display, so it's kept within that display.
+                guard let rect = controller.selection?.rect, let window else { return }
+                let global = window.convertPoint(toScreen: event.locationInWindow)
+                let target = NSScreen.screens.first { NSMouseInRect(global, $0.frame, false) } ?? screen
+                let area = target.frame.size
+                let size = NSSize(width: min(rect.width, area.width), height: min(rect.height, area.height))
+                var origin = NSPoint(x: global.x - target.frame.minX - offset.x, y: global.y - target.frame.minY - offset.y)
+                origin.x = min(max(origin.x, 0), area.width - size.width)
+                origin.y = min(max(origin.y, 0), area.height - size.height)
+                controller.setSelection((target, NSRect(origin: origin, size: size)))
             case .resize(let fixed, let xEdge, let yEdge, let original):
                 let x0 = xEdge ? min(fixed.x, p.x) : original.minX
                 let x1 = xEdge ? max(fixed.x, p.x) : original.maxX
