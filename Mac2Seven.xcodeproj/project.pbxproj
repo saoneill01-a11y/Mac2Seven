@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		000E30DAD35FD09A61D3EE15 /* LeftColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42CC5BE6A569B3CA01C33C2C /* LeftColumn.swift */; };
+		17E258DC011F54FE18903215 /* SnipSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E85F81374894D521952394 /* SnipSettingsView.swift */; };
+		1A4A1E18504EFF41B6A5CD84 /* SnipOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6C4ED483E76EBF57B451213 /* SnipOverlay.swift */; };
 		1E1BBD76B54B702328FD67F7 /* TaskbarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3455BFF9A0D5444083083D0F /* TaskbarView.swift */; };
 		33AA3E312DB957E46181CF0F /* Thumbnails.swift in Sources */ = {isa = PBXBuildFile; fileRef = C8C11D5C63395BB9E30684FB /* Thumbnails.swift */; };
 		3651CFF1484ACF89FE626647 /* Preferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C87F46FFAF127D98C0EAB6A3 /* Preferences.swift */; };
@@ -15,6 +17,7 @@
 		4200B9A2E5A8968DD2F1AAA7 /* SearchAndRightColumn.swift in Sources */ = {isa = PBXBuildFile; fileRef = D364158F6DC338730D0FF830 /* SearchAndRightColumn.swift */; };
 		431F67D4699102778BFFC49C /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32815DEA3C3856C2B8A5986 /* Backup.swift */; };
 		6242C5A412A5279583A0CD86 /* AppCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F3BF12325DFF4ACD1BAF880 /* AppCatalog.swift */; };
+		65E9376D5D3772D077514A0B /* SnipController.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3FAF3B066E02558C6054542 /* SnipController.swift */; };
 		7530BF57B18657E104B826D1 /* StartMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 653F4C4BAAA8592540565A82 /* StartMenuView.swift */; };
 		75C92CE765CB61CC4A6FF0B0 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 8B7850415F08BE281F8BD511 /* Sparkle */; };
 		7C352E8D80CC4B40FBFDC30F /* AllProgramsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6316497295C014241E62D7C3 /* AllProgramsView.swift */; };
@@ -26,6 +29,7 @@
 		B5CCA38948AA09FB0EB6CD4D /* DragDrop.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5843BBF1BACD22BC2BE50A85 /* DragDrop.swift */; };
 		C19D0C9B3A2CAD1E5C5E4899 /* AutoScroll.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59832C26A5B28BB9BF7CA6B /* AutoScroll.swift */; };
 		C4C542B8C22FE43502002435 /* Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E89C51B8DC0E6F03BCF288 /* Search.swift */; };
+		CE24E24729239A33C5A1F126 /* SnipViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A488A425C7492EE93EB928DF /* SnipViews.swift */; };
 		D3078994B154881F0AD6A952 /* CalendarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30087B3ECB6A06F8278BFB9 /* CalendarView.swift */; };
 		D62626520B93CB0ECFA861F6 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 048179323729F6280BE3BFEB /* SettingsView.swift */; };
 		DB8CE3AA2C842399F92C18D5 /* Library.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BB724A2AC69DFFA0B1AAC60 /* Library.swift */; };
@@ -35,6 +39,7 @@
 
 /* Begin PBXFileReference section */
 		048179323729F6280BE3BFEB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		05E85F81374894D521952394 /* SnipSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnipSettingsView.swift; sourceTree = "<group>"; };
 		06A9C6B37692DF37A3BC41FC /* Mac2Seven.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Mac2Seven.entitlements; sourceTree = "<group>"; };
 		2828B6F54B0E7353986822BF /* Updater.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updater.swift; sourceTree = "<group>"; };
 		3455BFF9A0D5444083083D0F /* TaskbarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskbarView.swift; sourceTree = "<group>"; };
@@ -50,11 +55,14 @@
 		928AD9240009A93040424271 /* TaskbarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskbarController.swift; sourceTree = "<group>"; };
 		92F0289B8281C70164926919 /* Mac2Seven.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Mac2Seven.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		9FEC946AD0BB9DDCB287A3B3 /* SystemSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSupport.swift; sourceTree = "<group>"; };
+		A488A425C7492EE93EB928DF /* SnipViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnipViews.swift; sourceTree = "<group>"; };
 		C3FE17F28C79981EE745CC10 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		C59832C26A5B28BB9BF7CA6B /* AutoScroll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoScroll.swift; sourceTree = "<group>"; };
 		C87F46FFAF127D98C0EAB6A3 /* Preferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Preferences.swift; sourceTree = "<group>"; };
 		C8C11D5C63395BB9E30684FB /* Thumbnails.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Thumbnails.swift; sourceTree = "<group>"; };
 		D364158F6DC338730D0FF830 /* SearchAndRightColumn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchAndRightColumn.swift; sourceTree = "<group>"; };
+		D3FAF3B066E02558C6054542 /* SnipController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnipController.swift; sourceTree = "<group>"; };
+		D6C4ED483E76EBF57B451213 /* SnipOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SnipOverlay.swift; sourceTree = "<group>"; };
 		E0364743BBD73907B05F3FB3 /* TaskbarSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskbarSettingsView.swift; sourceTree = "<group>"; };
 		E30087B3ECB6A06F8278BFB9 /* CalendarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarView.swift; sourceTree = "<group>"; };
 		E5C84DFCD7D10937F4CB9071 /* WindowTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowTracker.swift; sourceTree = "<group>"; };
@@ -134,6 +142,7 @@
 				06A9C6B37692DF37A3BC41FC /* Mac2Seven.entitlements */,
 				5E4482498FDBEC78DC6EFE9F /* App */,
 				292691D437FE29C9BCD04D33 /* Models */,
+				E636F72710031618D563B10F /* Snip */,
 				5860CA169C866B65B354D617 /* System */,
 				D5E001A45C58602CA855F490 /* Taskbar */,
 				1461D69A62A090B6EEE8243A /* Views */,
@@ -160,6 +169,17 @@
 				92F0289B8281C70164926919 /* Mac2Seven.app */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E636F72710031618D563B10F /* Snip */ = {
+			isa = PBXGroup;
+			children = (
+				D3FAF3B066E02558C6054542 /* SnipController.swift */,
+				D6C4ED483E76EBF57B451213 /* SnipOverlay.swift */,
+				05E85F81374894D521952394 /* SnipSettingsView.swift */,
+				A488A425C7492EE93EB928DF /* SnipViews.swift */,
+			);
+			path = Snip;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -248,6 +268,10 @@
 				C4C542B8C22FE43502002435 /* Search.swift in Sources */,
 				4200B9A2E5A8968DD2F1AAA7 /* SearchAndRightColumn.swift in Sources */,
 				D62626520B93CB0ECFA861F6 /* SettingsView.swift in Sources */,
+				65E9376D5D3772D077514A0B /* SnipController.swift in Sources */,
+				1A4A1E18504EFF41B6A5CD84 /* SnipOverlay.swift in Sources */,
+				17E258DC011F54FE18903215 /* SnipSettingsView.swift in Sources */,
+				CE24E24729239A33C5A1F126 /* SnipViews.swift in Sources */,
 				7530BF57B18657E104B826D1 /* StartMenuView.swift in Sources */,
 				B1E5D9B97B7BA9AE6BEAED88 /* SystemSupport.swift in Sources */,
 				38FAF05EF319A4169D840B60 /* TaskbarController.swift in Sources */,

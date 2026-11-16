@@ -23,6 +23,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let prefs = Preferences()
     let updater = UpdaterModel()
     private(set) lazy var taskbar = TaskbarController(prefs: prefs)
+    private(set) lazy var snip = SnipController(prefs: prefs)
+    private var snipHotKey: HotKey?
 
     private var statusItem: NSStatusItem!
     private var panel: StartPanel!
@@ -61,6 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &cancellables)
         installKeyMonitor()
         setUpTaskbar()
+        setUpSnip()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.showRecoveryNoticeIfNeeded() }
 
         #if DEBUG
@@ -104,6 +107,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 Task { @MainActor in
                     let starts = self.taskbar.startButtonRects().map { "\(Int($0.midX)),\(Int($0.midY))" }.joined(separator: " ")
                     try? "starts \(starts)\nhover \(self.taskbar.hoverState())\n".write(toFile: path, atomically: true, encoding: .utf8)
+                }
+            }
+        }
+        // Debug only: --snip [rectangle|window|fullScreen|freeform] [--snip-auto | --snip-sample]
+        if let i = CommandLine.arguments.firstIndex(of: "--snip") {
+            let args = CommandLine.arguments
+            let mode = i + 1 < args.count ? SnipMode(rawValue: args[i + 1]) : nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                if let mode { self.prefs.data.snip.mode = mode }
+                self.snip.start()
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                    if args.contains("--snip-auto") { self.snip.debugCapture() }
+                    if args.contains("--snip-sample") { self.snip.debugSelectSample() }
+                    if let j = args.firstIndex(of: "--snip-report"), j + 1 < args.count {
+                        // Debug only: writes the current selection to a file every 0.2 s.
+                        Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
+                            Task { @MainActor in
+                                let r = self.snip.selection?.rect ?? self.snip.shape?.path.bounds ?? .zero
+                                try? "x=\(Int(r.minX)) y=\(Int(r.minY)) w=\(Int(r.width)) h=\(Int(r.height))\n"
+                                    .write(toFile: args[j + 1], atomically: true, encoding: .utf8)
+                            }
+                        }
+                    }
+                    if let j = args.firstIndex(of: "--snip-move-test"), j + 1 < args.count {
+                        self.snip.debugMoveTest(report: args[j + 1])
+                    }
                 }
             }
         }
@@ -198,6 +227,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let reveal = NSMenuItem(title: "Show Data Folder", action: #selector(revealLibrary), keyEquivalent: "")
         reveal.target = self
         menu.addItem(reveal)
+        let shot = NSMenuItem(title: "Take Screenshot  (\(prefs.data.snip.hotkey.display))", action: #selector(snipFromMenu), keyEquivalent: "")
+        shot.target = self
+        menu.insertItem(shot, at: 1)
         let about = NSMenuItem(title: "About Mac2Seven", action: #selector(showAbout), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
@@ -266,6 +298,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Nothing needs keyboard focus on open; otherwise the tab bar shows a stray focus ring.
         DispatchQueue.main.async { [weak self] in self?.settingsWindow?.makeFirstResponder(nil) }
     }
+
+    // MARK: Snip
+
+    private func setUpSnip() {
+        snip.onWillStart = { [weak self] in
+            self?.closePanel()
+            self?.taskbar.hidePreviewNow()
+            self?.taskbar.hideCalendar()
+        }
+        snip.onOpenSettings = { [weak self] in self?.openSettings(tab: "screenshots") }
+        snip.bottomInset = { [weak self] in
+            guard let self, self.prefs.data.taskbar.enabled else { return 0 }
+            return self.taskbar.barHeight
+        }
+        taskbar.onSnip = { [weak self] in self?.snip.start() }
+        menuState.snipHandler = { [weak self] in
+            // Let the Start menu close first so it isn't in the way.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { self?.snip.start() }
+        }
+        // Follow the Snip shortcut setting; off while any shortcut is being recorded.
+        prefs.$data.map(\.snip.hotkey).removeDuplicates()
+            .combineLatest(prefs.$isRecordingHotkey.removeDuplicates())
+            .sink { [weak self] spec, recording in
+                self?.snipHotKey = nil
+                guard !recording else { return }
+                self?.snipHotKey = HotKey(keyCode: spec.keyCode, modifiers: spec.modifiers) { [weak self] in
+                    self?.snip.start()
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    @objc private func snipFromMenu() { snip.start() }
 
     // MARK: Taskbar
 

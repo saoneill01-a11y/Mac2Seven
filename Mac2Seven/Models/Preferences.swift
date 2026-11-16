@@ -38,6 +38,66 @@ struct HotkeySpec: Codable, Equatable {
     var display: String
 
     static let `default` = HotkeySpec(keyCode: UInt32(kVK_Space), modifiers: UInt32(optionKey), display: "⌥Space")
+    static let snip = HotkeySpec(keyCode: UInt32(kVK_ANSI_S), modifiers: UInt32(optionKey | shiftKey), display: "⌥⇧S")
+}
+
+enum SnipMode: String, Codable, CaseIterable, Identifiable {
+    case rectangle, window, fullScreen, freeform
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .rectangle: return "Rectangle"
+        case .window: return "Window"
+        case .fullScreen: return "Full screen"
+        case .freeform: return "Freeform"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .rectangle: return "rectangle.dashed"
+        case .window: return "macwindow"
+        case .fullScreen: return "display"
+        case .freeform: return "scribble"
+        }
+    }
+}
+
+struct SnipSettings: Codable, Equatable {
+    var hotkey: HotkeySpec = .snip
+    var saveFolder: String = FileManager.default.homeDirectoryForCurrentUser.path + "/Pictures/Screenshots"
+    var autoSave = true
+    var copyToClipboard = true
+    var openInPreview = true
+    var showThumbnail = true
+    var showPointer = false
+    var windowShadow = true
+    var taskbarButton = true
+    var mode: SnipMode = .rectangle
+    var delay = 0
+    /// The last rectangle captured (in its display's points, origin bottom-left) and that display's ID,
+    /// so Rectangle mode can start with it already drawn.
+    var lastRect: CGRect?
+    var lastRectDisplay: UInt32?
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = SnipSettings()
+        hotkey = (try? c.decodeIfPresent(HotkeySpec.self, forKey: .hotkey)) ?? d.hotkey
+        saveFolder = (try? c.decodeIfPresent(String.self, forKey: .saveFolder)) ?? d.saveFolder
+        autoSave = (try? c.decodeIfPresent(Bool.self, forKey: .autoSave)) ?? d.autoSave
+        copyToClipboard = (try? c.decodeIfPresent(Bool.self, forKey: .copyToClipboard)) ?? d.copyToClipboard
+        openInPreview = (try? c.decodeIfPresent(Bool.self, forKey: .openInPreview)) ?? d.openInPreview
+        showThumbnail = (try? c.decodeIfPresent(Bool.self, forKey: .showThumbnail)) ?? d.showThumbnail
+        showPointer = (try? c.decodeIfPresent(Bool.self, forKey: .showPointer)) ?? d.showPointer
+        windowShadow = (try? c.decodeIfPresent(Bool.self, forKey: .windowShadow)) ?? d.windowShadow
+        taskbarButton = (try? c.decodeIfPresent(Bool.self, forKey: .taskbarButton)) ?? d.taskbarButton
+        mode = (try? c.decodeIfPresent(SnipMode.self, forKey: .mode)) ?? d.mode
+        delay = (try? c.decodeIfPresent(Int.self, forKey: .delay)) ?? d.delay
+        lastRect = try? c.decodeIfPresent(CGRect.self, forKey: .lastRect)
+        lastRectDisplay = try? c.decodeIfPresent(UInt32.self, forKey: .lastRectDisplay)
+    }
 }
 
 /// One entry in the right-hand column: a folder or app to open, or a separator line.
@@ -130,6 +190,7 @@ struct PrefsData: Codable, Equatable {
     var frequentCount = 10
     var autoHideHelpers = true
     var taskbar = TaskbarSettings()
+    var snip = SnipSettings()
 
     init() {}
 
@@ -147,6 +208,7 @@ struct PrefsData: Codable, Equatable {
         frequentCount = (try? c.decodeIfPresent(Int.self, forKey: .frequentCount)) ?? d.frequentCount
         autoHideHelpers = (try? c.decodeIfPresent(Bool.self, forKey: .autoHideHelpers)) ?? d.autoHideHelpers
         taskbar = (try? c.decodeIfPresent(TaskbarSettings.self, forKey: .taskbar)) ?? d.taskbar
+        snip = (try? c.decodeIfPresent(SnipSettings.self, forKey: .snip)) ?? d.snip
     }
 
     static func defaultPlaces() -> [Place] {

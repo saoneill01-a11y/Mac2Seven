@@ -26,6 +26,8 @@ struct TaskbarActions {
     var openSettings: () -> Void
     /// Opens or closes the calendar above the clock (given in screen coordinates).
     var calendar: (NSRect) -> Void
+    /// Starts Mac2Seven Snip.
+    var snip: () -> Void
 }
 
 struct TaskbarView: View {
@@ -64,6 +66,7 @@ struct TaskbarView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.leading, settings.alignment == .left ? 6 : 0)
             TrayView(barFrame: barFrame, actions: actions, needsAccess: !tracker.hasAccessibility,
+                     showSnip: prefs.data.snip.taskbarButton,
                      onDesktop: { tracker.toggleDesktop() },
                      onAccess: { tracker.requestAccessibility(); actions.openSettings() })
                 .frame(width: Self.trayWidth)
@@ -461,9 +464,11 @@ struct TrayView: View {
     let barFrame: NSRect
     let actions: TaskbarActions
     let needsAccess: Bool
+    let showSnip: Bool
     let onDesktop: () -> Void
     let onAccess: () -> Void
     @EnvironmentObject var hover: HoverModel
+    @State private var snipFrame = NSRect.zero
     @State private var clockFrame = NSRect.zero
     @State private var desktopFrame = NSRect.zero
     @State private var accessFrame = NSRect.zero
@@ -473,6 +478,18 @@ struct TrayView: View {
     var body: some View {
         HStack(spacing: 6) {
             Spacer(minLength: 0)
+            if showSnip {
+                Button(action: actions.snip) {
+                    Image(systemName: "scissors")
+                        .font(.system(size: 15))
+                        .frame(width: 32, height: 40)
+                        .background(ButtonChrome(hovering: hover.hoveredID == "snip", pressedLook: false))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(ScreenFrameReader(barFrame: barFrame, frame: $snipFrame, id: "snip", target: nil, actions: actions))
+                .help("Take a screenshot (Snip)")
+            }
             if needsAccess {
                 // Without Accessibility the taskbar can't see windows; say so where it matters.
                 Button(action: onAccess) {
