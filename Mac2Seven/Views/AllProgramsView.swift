@@ -9,6 +9,34 @@ struct AllProgramsView: View {
     @State private var editing: UUID?
     @State private var topDropTarget = false
 
+    @ViewBuilder
+    private func headerButtons(iconOnly: Bool) -> some View {
+        HStack(spacing: 12) {
+            Button {
+                state.openSettings("organize")
+            } label: {
+                Label("Organize…", systemImage: "wand.and.stars")
+                    .labelStyle(HeaderLabelStyle(iconOnly: iconOnly))
+                    .scaledFont(size: 12)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .buttonStyle(.borderless)
+            .help("Organize…")
+            Button {
+                editing = library.addFolder(parent: nil)
+            } label: {
+                Label("New Folder", systemImage: "folder.badge.plus")
+                    .labelStyle(HeaderLabelStyle(iconOnly: iconOnly))
+                    .scaledFont(size: 12)
+                    .lineLimit(1)
+                    .fixedSize()
+            }
+            .buttonStyle(.borderless)
+            .help("New Folder")
+        }
+    }
+
     var body: some View {
         let autoHide = prefs.data.autoHideHelpers
         let loose = library.looseApps(from: catalog.apps).filter { !library.isHidden($0, autoHide: autoHide) }
@@ -18,23 +46,17 @@ struct AllProgramsView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Text("All Programs")
-                    .font(.system(size: 12, weight: .semibold))
+                    .scaledFont(size: 12, weight: .semibold)
                     .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    state.openSettings("organize")
-                } label: {
-                    Label("Organize…", systemImage: "wand.and.stars")
-                        .font(.system(size: 12))
+                    .lineLimit(1)
+                    .fixedSize()
+                Spacer(minLength: 4)
+                // Full labels when they fit, otherwise just the icons. (Shrink-to-fit text here could keep
+                // re-measuring and lock up the menu.)
+                ViewThatFits(in: .horizontal) {
+                    headerButtons(iconOnly: false)
+                    headerButtons(iconOnly: true)
                 }
-                .buttonStyle(.borderless)
-                Button {
-                    editing = library.addFolder(parent: nil)
-                } label: {
-                    Label("New Folder", systemImage: "folder.badge.plus")
-                        .font(.system(size: 12))
-                }
-                .buttonStyle(.borderless)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -79,21 +101,23 @@ struct HiddenSection: View {
     let apps: [AppItem]
     @EnvironmentObject var state: MenuState
     @Environment(\.palette) private var p
+    @Environment(\.textScale) private var scale
     @State private var open = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 1) {
             HStack(spacing: 7) {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 9, weight: .bold))
+                    .scaledFont(size: 9, weight: .bold)
                     .rotationEffect(.degrees(open ? 90 : 0))
                     .foregroundStyle(.secondary)
-                    .frame(width: 10)
+                    .frame(width: 10 * scale)
                 Image(systemName: "eye.slash")
+                    .scaledFont(size: 13)
                     .foregroundStyle(.secondary)
-                    .frame(width: 16)
+                    .frame(width: 16 * scale)
                 Text("Hidden (\(apps.count))")
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(.secondary)
                 Spacer(minLength: 0)
             }
@@ -131,6 +155,7 @@ struct FolderTree: View {
     @EnvironmentObject var catalog: AppCatalog
     @EnvironmentObject var state: MenuState
     @Environment(\.palette) private var p
+    @Environment(\.textScale) private var scale
     @State private var dropTarget = false
     /// An app is being dragged over this folder's title row.
     @State private var headerTarget = false
@@ -140,6 +165,7 @@ struct FolderTree: View {
 
     private var isOpen: Bool { expanded.contains(folder.id) }
     private var isEditing: Bool { editing == folder.id }
+    /// Unscaled; AppRow scales its indent itself.
     private var childIndent: CGFloat { CGFloat(depth + 1) * 16 + 17 }
     private var headerKey: String { "folder:" + folder.id.uuidString }
 
@@ -161,9 +187,9 @@ struct FolderTree: View {
                 }
                 if folder.apps.isEmpty && folder.children.isEmpty {
                     Text("Empty. Drag apps here.")
-                        .font(.system(size: 11))
+                        .scaledFont(size: 11)
                         .foregroundStyle(.secondary)
-                        .padding(.leading, childIndent + 6)
+                        .padding(.leading, childIndent * scale + 6)
                         .padding(.vertical, 2)
                 }
             }
@@ -195,17 +221,18 @@ struct FolderTree: View {
     private var header: some View {
         HStack(spacing: 7) {
             Image(systemName: "chevron.right")
-                .font(.system(size: 9, weight: .bold))
+                .scaledFont(size: 9, weight: .bold)
                 .rotationEffect(.degrees(isOpen ? 90 : 0))
                 .foregroundStyle(.secondary)
-                .frame(width: 10)
+                .frame(width: 10 * scale)
             Image(systemName: isOpen ? "folder.fill" : "folder")
+                .scaledFont(size: 13)
                 .foregroundStyle(Theme.folderTint)
-                .frame(width: 16)
+                .frame(width: 16 * scale)
             if isEditing {
                 TextField("Folder name", text: $draftName)
                     .textFieldStyle(.roundedBorder)
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .focused($nameFocused)
                     .onSubmit(commitRename)
                     .onAppear {
@@ -217,12 +244,12 @@ struct FolderTree: View {
                     }
             } else {
                 Text(folder.name)
-                    .font(.system(size: 12))
+                    .scaledFont(size: 12)
                     .foregroundStyle(p.text)
             }
             Spacer(minLength: 0)
         }
-        .padding(.leading, 6 + CGFloat(depth) * 16)
+        .padding(.leading, 6 + CGFloat(depth) * 16 * scale)
         .padding(.trailing, 6)
         .padding(.vertical, 3)
         .background(RowHighlight(active: state.hoveredID == headerKey && !state.isDragging))
@@ -271,6 +298,7 @@ struct FolderTree: View {
 private struct SnipRow: View {
     @EnvironmentObject var state: MenuState
     @Environment(\.palette) private var p
+    @Environment(\.textScale) private var scale
     @State private var hovering = false
 
     var body: some View {
@@ -280,16 +308,16 @@ private struct SnipRow: View {
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "scissors")
-                    .font(.system(size: 11, weight: .semibold))
+                    .scaledFont(size: 11, weight: .semibold)
                     .foregroundStyle(.white)
-                    .frame(width: 16, height: 16)
-                    .background(RoundedRectangle(cornerRadius: 4).fill(Color(red: 0.18, green: 0.5, blue: 0.88)))
+                    .frame(width: 16 * scale, height: 16 * scale)
+                    .background(RoundedRectangle(cornerRadius: 4 * scale).fill(Color(red: 0.18, green: 0.5, blue: 0.88)))
                 Text("Mac2Seven Snip")
-                    .font(.system(size: 13))
+                    .scaledFont(size: 13)
                     .foregroundStyle(p.text)
                 Spacer()
             }
-            .padding(.leading, 17)
+            .padding(.leading, 17 * scale)
             .padding(.vertical, 4)
             .padding(.trailing, 8)
             .background(RowHighlight(active: hovering))
@@ -298,5 +326,20 @@ private struct SnipRow: View {
         .buttonStyle(.plain)
         .onHover { hovering = $0 }
         .help("Take a screenshot")
+    }
+}
+
+/// The All Programs header buttons: icon and title, or just the icon when space is short.
+private struct HeaderLabelStyle: LabelStyle {
+    let iconOnly: Bool
+    func makeBody(configuration: Configuration) -> some View {
+        if iconOnly {
+            configuration.icon
+        } else {
+            HStack(spacing: 4) {
+                configuration.icon
+                configuration.title
+            }
+        }
     }
 }

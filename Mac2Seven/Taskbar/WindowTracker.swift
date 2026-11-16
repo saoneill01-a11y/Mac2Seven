@@ -39,6 +39,8 @@ final class WindowTracker: ObservableObject {
 
     /// Paths of pinned apps, in taskbar order.
     var pinnedPaths: [String] = [] { didSet { if pinnedPaths != oldValue { refresh() } } }
+    /// The order set by dragging buttons; apps not in it keep their default place after the ones that are.
+    var orderPaths: [String] = [] { didSet { if orderPaths != oldValue { refresh() } } }
     /// Called on the polling queue with the focused window so it can be moved clear of the taskbar.
     var adjustFocusedWindow: ((AXUIElement) -> Void)?
 
@@ -54,6 +56,9 @@ final class WindowTracker: ObservableObject {
 
     func start() {
         guard timer == nil else { return }
+        // One app that stops responding must not stall the taskbar: every Accessibility call from Mac2Seven
+        // (window lists, titles, minimize, close) gives up after half a second instead of the default ~6 s.
+        AXUIElementSetMessagingTimeout(AXUIElementCreateSystemWide(), 0.5)
         let nc = NSWorkspace.shared.notificationCenter
         for name in [NSWorkspace.didLaunchApplicationNotification, NSWorkspace.didTerminateApplicationNotification,
                      NSWorkspace.didActivateApplicationNotification, NSWorkspace.didHideApplicationNotification,
@@ -186,7 +191,14 @@ final class WindowTracker: ObservableObject {
                            windows: info.flatMap { windows[$0.pid] } ?? [],
                            pinned: pinnedSet.contains(path), isFrontmost: info?.active ?? false, isHidden: info?.hidden ?? false)
         }
-        let next = pinned.map(entry) + runningOrder.map(entry)
+        var next = pinned.map(entry) + runningOrder.map(entry)
+        if !orderPaths.isEmpty {
+            let rank = Dictionary(orderPaths.enumerated().map { ($1, $0) }, uniquingKeysWith: { a, _ in a })
+            next = next.enumerated()
+                .sorted { (rank[$0.element.path] ?? orderPaths.count + $0.offset, $0.offset)
+                        < (rank[$1.element.path] ?? orderPaths.count + $1.offset, $1.offset) }
+                .map(\.element)
+        }
         if next != apps { apps = next }
     }
 
@@ -203,7 +215,7 @@ final class WindowTracker: ObservableObject {
         }
         let apps = [
             app("/System/Library/CoreServices/Finder.app", "Finder", pinned: true, ["Documents", "Downloads"]),
-            app("/Applications/Safari.app", "Safari", pinned: true, front: true, ["Start Page", "Travel ideas"]),
+            app("/Applications/Safari.app", "Safari", pinned: true, front: true, ["Start Page", "Travel ideas", "Weather"]),
             app("/System/Applications/Mail.app", "Mail", pinned: true, ["Inbox"]),
             app("/System/Applications/Calendar.app", "Calendar", pinned: true, []),
             app("/System/Applications/Messages.app", "Messages", pinned: true, []),
@@ -214,6 +226,22 @@ final class WindowTracker: ObservableObject {
         return (apps, apps[1].windows.first?.id)
     }
     #endif
+
+    /// Moves one window's button before or after another window of the same app (window titles mode).
+    /// Windows keep this order while they're open.
+    func moveWindow(_ id: CGWindowID, nextTo target: CGWindowID, before: Bool) {
+        guard let index = apps.firstIndex(where: { $0.windows.contains { $0.id == id } }) else { return }
+        let app = apps[index]
+        var ids = app.windows.map(\.id)
+        ids.removeAll { $0 == id }
+        guard let at = ids.firstIndex(of: target) else { return }
+        ids.insert(id, at: before ? at : at + 1)
+        // Reuse the app's existing ranks, handed out in the new order.
+        var ranks = app.windows.compactMap { windowOrder[$0.id] }.sorted()
+        while ranks.count < ids.count { ranks.append(nextOrder); nextOrder += 1 }
+        for (k, wid) in ids.enumerated() { windowOrder[wid] = ranks[k] }
+        apps[index].windows = ids.compactMap { wid in app.windows.first { $0.id == wid } }
+    }
 
     // MARK: Actions
 

@@ -49,7 +49,7 @@ final class TaskbarController {
     /// Where each hoverable element is on screen, keyed by its id.
     /// Where each hoverable element is on screen, one table per taskbar (one per display), keyed by element id.
     /// Every bar has the same ids ("start", app paths…), so they must not share a table.
-    private var hoverZones: [[String: (target: PreviewTarget?, rect: NSRect)]] = []
+    private var hoverZones: [[String: (target: PreviewTarget?, rect: NSRect, owner: UUID)]] = []
     /// Hover highlight state for each bar's buttons (the shared `hoverModel` is for the preview popup).
     private var barHovers: [HoverModel] = []
     /// The hovered element as "bar|id", or nil.
@@ -120,6 +120,11 @@ final class TaskbarController {
 
     private func apply(_ settings: TaskbarSettings) {
         tracker.pinnedPaths = settings.pinned
+        tracker.orderPaths = settings.order
+        // Turning the taskbar off or on while running: show the Dock, or hide it again if the user chose that.
+        if let last = lastSettings, last.enabled != settings.enabled {
+            if settings.enabled { Dock.rehideAtLaunch(taskbarOn: true) } else { Dock.restoreForQuit() }
+        }
         guard settings.enabled else {
             bars.forEach { $0.orderOut(nil) }
             bars = []
@@ -150,6 +155,7 @@ final class TaskbarController {
     private func rebuildBars(_ settings: TaskbarSettings) {
         bars.forEach { $0.orderOut(nil) }
         bars = []
+        cancelDrag()
         hoverZones = []
         barHovers = []
         hoveredKey = nil
@@ -186,15 +192,24 @@ final class TaskbarController {
     private func actions(for bar: Int) -> TaskbarActions {
         TaskbarActions(
             start: { [weak self] rect in self?.hidePreviewNow(); self?.onStart(rect) },
-            register: { [weak self] id, target, rect in
+            register: { [weak self] id, target, rect, owner in
                 guard let self, self.hoverZones.indices.contains(bar) else { return }
-                if rect.isEmpty { self.hoverZones[bar][id] = nil } else { self.hoverZones[bar][id] = (target, rect) }
+                if rect.isEmpty {
+                    // Only the view that made the entry may remove it. When SwiftUI rebuilds a button (after a
+                    // reorder, or as windows come and go), the new copy can register before the old one leaves.
+                    if self.hoverZones[bar][id]?.owner == owner { self.hoverZones[bar][id] = nil }
+                } else {
+                    self.hoverZones[bar][id] = (target, rect, owner)
+                }
             },
             showPreview: { [weak self] target, rect in self?.showPreview(target, at: rect) },
             hidePreview: { [weak self] in self?.hidePreviewNow() },
             openSettings: { [weak self] in self?.onOpenSettings() },
             calendar: { [weak self] rect in self?.toggleCalendar(below: rect) },
-            snip: { [weak self] in self?.onSnip() }
+            snip: { [weak self] in self?.onSnip() },
+            dragMoved: { [weak self] path, window, point in self?.dragMoved(bar: bar, path: path, window: window, point: point) },
+            dragEnded: { [weak self] path, window, point in self?.dragEnded(bar: bar, path: path, window: window, point: point) },
+            dragCancelled: { [weak self] in self?.cancelDrag() }
         )
     }
 
@@ -226,12 +241,97 @@ final class TaskbarController {
         }
     }
 
+    // MARK: Dragging buttons to reorder
+
+    private var isDraggingButton = false
+    /// Where a dragged button would land: next to this app's button (or one of its windows), before or after it.
+    private var dropTarget: (path: String, window: CGWindowID?, before: Bool)?
+
+    /// The app a hover zone's button belongs to, if the zone is an app or window button.
+    private func appPath(for target: PreviewTarget?) -> String? {
+        switch target {
+        case .app(let path): return path
+        case .window(let id): return tracker.apps.first { $0.windows.contains { $0.id == id } }?.path
+        case nil: return nil
+        }
+    }
+
+    private func dragMoved(bar: Int, path: String, window: CGWindowID?, point: NSPoint) {
+        guard bars.indices.contains(bar), hoverZones.indices.contains(bar) else { return }
+        if !isDraggingButton {
+            isDraggingButton = true
+            hidePreviewNow()
+            barHovers[bar].draggingPath = path
+            barHovers[bar].draggingWindow = window
+        }
+        let barFrame = bars[bar].frame
+        // Let go well away from the bar and nothing changes.
+        guard barFrame.insetBy(dx: 0, dy: -30).contains(point) else {
+            dropTarget = nil
+            barHovers[bar].dropLine = nil
+            return
+        }
+        // A window's button can land between its own app's other windows; anything else lands next to
+        // another app (and moves its whole app there).
+        let buttons = hoverZones[bar].values.compactMap { zone -> (path: String, window: CGWindowID?, rect: NSRect)? in
+            guard let p = appPath(for: zone.target), barFrame.intersects(zone.rect) else { return nil }
+            let zoneWindow: CGWindowID? = { if case .window(let id) = zone.target { return id } else { return nil } }()
+            if p == path {
+                guard let window, let zoneWindow, zoneWindow != window else { return nil }
+            }
+            return (p, zoneWindow, zone.rect)
+        }
+        guard !buttons.isEmpty else { return }
+        // Prefer buttons on the pointer's row, then the one nearest the pointer sideways.
+        let rowDistance = { (r: NSRect) -> CGFloat in point.y < r.minY ? r.minY - point.y : (point.y > r.maxY ? point.y - r.maxY : 0) }
+        let nearestRow = buttons.map { rowDistance($0.rect) }.min() ?? 0
+        let row = buttons.filter { rowDistance($0.rect) <= nearestRow + 0.5 }
+        guard let target = row.min(by: { abs($0.rect.midX - point.x) < abs($1.rect.midX - point.x) }) else { return }
+        let before = point.x < target.rect.midX
+        dropTarget = (target.path, target.window, before)
+        let x = before ? target.rect.minX - 1 : target.rect.maxX + 1
+        barHovers[bar].dropLine = CGRect(x: x - barFrame.minX, y: barFrame.maxY - target.rect.maxY + 4,
+                                         width: 3, height: target.rect.height - 8)
+    }
+
+    private func dragEnded(bar: Int, path: String, window: CGWindowID?, point: NSPoint) {
+        dragMoved(bar: bar, path: path, window: window, point: point)
+        if let target = dropTarget, let window, target.path == path, let targetWindow = target.window {
+            // Reordering one window within its own app's group.
+            tracker.moveWindow(window, nextTo: targetWindow, before: target.before)
+        } else if let target = dropTarget, target.path != path {
+            let visible = tracker.apps.map(\.path)
+            var order = visible
+            order.removeAll { $0 == path }
+            if let i = order.firstIndex(of: target.path) {
+                order.insert(path, at: target.before ? i : i + 1)
+                // Apps that aren't on the bar right now keep their remembered place after the ones that are.
+                let current = Set(visible)
+                order += prefs.data.taskbar.order.filter { !current.contains($0) }
+                prefs.data.taskbar.order = order
+                // Pinned apps follow the same order, so the list in Settings matches the taskbar.
+                let pinned = Set(prefs.data.taskbar.pinned)
+                let reordered = order.filter { pinned.contains($0) }
+                prefs.data.taskbar.pinned = reordered + prefs.data.taskbar.pinned.filter { !reordered.contains($0) }
+            }
+        }
+        cancelDrag()
+    }
+
+    /// Clears any drag in progress (the button went away, the bars were rebuilt, or the mouse is up).
+    private func cancelDrag() {
+        dropTarget = nil
+        isDraggingButton = false
+        barHovers.forEach { $0.draggingPath = nil; $0.draggingWindow = nil; $0.dropLine = nil }
+    }
+
     // MARK: Pointer tracking
 
     /// Works out what the pointer is over. SwiftUI's own hover events need the window's app to be
     /// active, which the taskbar's app never is, so the pointer position is checked directly instead.
     private func trackPointer() {
         let point = NSEvent.mouseLocation
+        if isDraggingButton && NSEvent.pressedMouseButtons & 1 == 0 { cancelDrag() }
 
         if let panel = previewPanel, panel.isVisible, panel.frame.contains(point) {
             previewHovered = true
@@ -285,7 +385,7 @@ final class TaskbarController {
 
     private func hover(_ target: PreviewTarget?, _ rect: NSRect) {
         hoverWork?.cancel()
-        guard prefs.data.taskbar.showPreviews else { return }
+        guard prefs.data.taskbar.showPreviews, dropTarget == nil, !isDraggingButton else { return }
         if let target {
             hideWork?.cancel()
             let alreadyOpen = previewPanel?.isVisible == true
@@ -413,6 +513,21 @@ final class TaskbarController {
     /// Debug only: the Start button's screen rect on each bar, for tests.
     func startButtonRects() -> [NSRect] {
         hoverZones.compactMap { $0["start"]?.rect }
+    }
+
+    /// Debug only: each app button on the first bar, left to right, as "Name@x,y" (screen centre).
+    func buttonCentres() -> String {
+        guard let zones = hoverZones.first else { return "" }
+        return zones.values.compactMap { z -> (String, NSRect)? in
+            guard let p = appPath(for: z.target), bars.first?.frame.intersects(z.rect) == true else { return nil }
+            var name = (p as NSString).lastPathComponent.replacingOccurrences(of: ".app", with: "")
+            name = name.replacingOccurrences(of: " ", with: "_")
+            if case .window(let id) = z.target { name += "#\(id)" }
+            return (name, z.rect)
+        }
+        .sorted { $0.1.minX < $1.1.minX }
+        .map { "\($0.0)@\(Int($0.1.midX)),\(Int($0.1.midY))" }
+        .joined(separator: " ")
     }
 
     /// Debug only: which bar shows a hover highlight, and on what.

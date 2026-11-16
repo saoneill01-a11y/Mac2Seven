@@ -26,6 +26,11 @@ final class MenuState: ObservableObject {
     /// Starts Mac2Seven Snip (from the Start menu).
     var snipHandler: () -> Void = {}
 
+    /// `began` carries how far the pointer had already moved when the drag was recognised.
+    enum ResizeStep { case began(CGSize), changed, ended, reset }
+    /// Resizes the menu window as its grip is dragged.
+    var resizeHandler: (ResizeStep) -> Void = { _ in }
+
     func openSettings(_ tab: String) { openSettingsHandler(tab) }
 
     struct DropLine: Equatable {

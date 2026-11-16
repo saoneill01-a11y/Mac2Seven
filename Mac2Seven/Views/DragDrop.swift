@@ -90,7 +90,7 @@ struct DragPreview: View {
                 .foregroundStyle(tint ?? .primary)
                 .frame(width: 20, height: 20)
             Text(name)
-                .font(.system(size: 12))
+                .scaledFont(size: 12)
                 .foregroundStyle(Color.black.opacity(0.85))
                 .lineLimit(1)
         }

@@ -113,8 +113,19 @@ struct TaskbarSettingsView: View {
     private func move(_ path: String, by offset: Int) {
         var pins = prefs.data.taskbar.pinned
         guard let i = pins.firstIndex(of: path), pins.indices.contains(i + offset) else { return }
+        let other = pins[i + offset]
         pins.swapAt(i, i + offset)
         prefs.data.taskbar.pinned = pins
+        // Keep the taskbar's dragged order in step: swap the two apps there too.
+        var order = prefs.data.taskbar.order
+        if !order.isEmpty {
+            // A pin added after the last drag isn't in the order yet; add it so the swap shows on the taskbar.
+            for p in [path, other] where !order.contains(p) { order.append(p) }
+            if let a = order.firstIndex(of: path), let b = order.firstIndex(of: other) {
+                order.swapAt(a, b)
+                prefs.data.taskbar.order = order
+            }
+        }
     }
 
     private func addApp() {
@@ -129,7 +140,7 @@ struct TaskbarSettingsView: View {
     }
 
     private func setDockAway(_ away: Bool) {
-        if Dock.setKeptAway(away) {
+        if Dock.setHiddenByUser(away) {
             dockError = nil
             dockAway = away
         } else {
@@ -171,6 +182,39 @@ enum Dock {
     private static let longDelay: Double = 1000
     /// Remembers whether auto-hide was already on before Mac2Seven hid the Dock.
     private static let autohideWasOnKey = "dockAutohideWasOn"
+    /// The user chose Hide the Dock (and hasn't chosen Show the Dock Again). The Dock comes back while
+    /// Mac2Seven isn't running and is hidden again when it starts.
+    private static let wantsHiddenKey = "dockHiddenByMac2Seven"
+
+    static var wantsHidden: Bool { UserDefaults.standard.bool(forKey: wantsHiddenKey) }
+
+    /// The Hide the Dock / Show the Dock Again buttons.
+    @discardableResult
+    static func setHiddenByUser(_ hidden: Bool) -> Bool {
+        UserDefaults.standard.set(hidden, forKey: wantsHiddenKey)
+        return setKeptAway(hidden)
+    }
+
+    /// When Mac2Seven quits: show the Dock all the time (no auto-hide), so the Mac is never left without
+    /// either. The choice is kept, and the Dock is hidden again when Mac2Seven starts.
+    static func restoreForQuit() {
+        guard wantsHidden && isKeptAway else { return }
+        run("/usr/bin/defaults", ["delete", "com.apple.dock", "autohide-delay"])
+        run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide", "-bool", "false"])
+        run("/usr/bin/killall", ["Dock"])
+    }
+
+    /// When Mac2Seven starts: hide the Dock again if the user had chosen that and the taskbar is on.
+    static func rehideAtLaunch(taskbarOn: Bool) {
+        // Versions before 1.3.1 hid the Dock without recording the choice; adopt it if Mac2Seven did the hiding.
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: wantsHiddenKey) == nil, defaults.object(forKey: autohideWasOnKey) != nil, isKeptAway {
+            defaults.set(true, forKey: wantsHiddenKey)
+        }
+        // Re-hiding doesn't re-record the user's own auto-hide setting: after a quit it reads "off", which is
+        // Mac2Seven's doing, not theirs.
+        if wantsHidden && taskbarOn && !isKeptAway { setKeptAway(true, recordOriginal: false) }
+    }
 
     private static func value(_ key: String) -> Any? {
         CFPreferencesAppSynchronize(domain)
@@ -182,10 +226,12 @@ enum Dock {
     }
 
     @discardableResult
-    static func setKeptAway(_ away: Bool) -> Bool {
+    static func setKeptAway(_ away: Bool, recordOriginal: Bool = true) -> Bool {
         var ok: Bool
         if away {
-            UserDefaults.standard.set(value("autohide") as? Bool ?? false, forKey: autohideWasOnKey)
+            if recordOriginal || UserDefaults.standard.object(forKey: autohideWasOnKey) == nil {
+                UserDefaults.standard.set(value("autohide") as? Bool ?? false, forKey: autohideWasOnKey)
+            }
             ok = run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide", "-bool", "true"])
             ok = ok && run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide-delay", "-float", String(longDelay)])
         } else {

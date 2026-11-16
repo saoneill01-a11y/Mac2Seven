@@ -154,6 +154,9 @@ struct TaskbarSettings: Codable, Equatable {
     var hideWindowless = false
     var calendarStyle: CalendarStyle = .glass
     var pinned: [String] = TaskbarSettings.defaultPins()
+    /// The order of the taskbar's app buttons (pinned and running), as set by dragging. Empty means
+    /// pinned apps in pin order, then running apps in the order they opened.
+    var order: [String] = []
 
     init() {}
 
@@ -170,6 +173,7 @@ struct TaskbarSettings: Codable, Equatable {
         hideWindowless = (try? c.decodeIfPresent(Bool.self, forKey: .hideWindowless)) ?? d.hideWindowless
         calendarStyle = (try? c.decodeIfPresent(CalendarStyle.self, forKey: .calendarStyle)) ?? d.calendarStyle
         pinned = (try? c.decodeIfPresent([String].self, forKey: .pinned)) ?? d.pinned
+        order = (try? c.decodeIfPresent([String].self, forKey: .order)) ?? d.order
     }
 
     static func defaultPins() -> [String] {
@@ -191,6 +195,13 @@ struct PrefsData: Codable, Equatable {
     var autoHideHelpers = true
     var taskbar = TaskbarSettings()
     var snip = SnipSettings()
+    /// Text size in the Start menu, as a multiple of the normal size.
+    var textScale: Double = 1.0
+    /// Text size on the taskbar, as a multiple of the normal size.
+    var taskbarTextScale: Double = 1.0
+    /// The Start menu's size, set by dragging its resize grip.
+    var menuWidth: Double = 580
+    var menuHeight: Double = 620
 
     init() {}
 
@@ -209,6 +220,11 @@ struct PrefsData: Codable, Equatable {
         autoHideHelpers = (try? c.decodeIfPresent(Bool.self, forKey: .autoHideHelpers)) ?? d.autoHideHelpers
         taskbar = (try? c.decodeIfPresent(TaskbarSettings.self, forKey: .taskbar)) ?? d.taskbar
         snip = (try? c.decodeIfPresent(SnipSettings.self, forKey: .snip)) ?? d.snip
+        textScale = min(max((try? c.decodeIfPresent(Double.self, forKey: .textScale)) ?? d.textScale, 0.8), 1.5)
+        // Until 1.3.1 one setting covered both; carry it over to the taskbar.
+        taskbarTextScale = min(max((try? c.decodeIfPresent(Double.self, forKey: .taskbarTextScale)) ?? textScale, 0.8), 1.5)
+        menuWidth = max((try? c.decodeIfPresent(Double.self, forKey: .menuWidth)) ?? d.menuWidth, 480)
+        menuHeight = max((try? c.decodeIfPresent(Double.self, forKey: .menuHeight)) ?? d.menuHeight, 460)
     }
 
     static func defaultPlaces() -> [Place] {

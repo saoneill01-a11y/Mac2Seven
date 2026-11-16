@@ -28,6 +28,10 @@ final class SnipController {
     private var thumbnailHide: DispatchWorkItem?
     private var cancellables = Set<AnyCancellable>()
     private(set) var isActive = false
+    /// The app that was in front when Snip opened; it gets the keyboard back when Snip closes.
+    private var previousApp: NSRunningApplication?
+    /// Pixels per point of the last capture, so the clipboard image has the right size on any display.
+    private var captureScale: CGFloat = 2
 
     /// The current rectangle, on one display, in that display's points (origin bottom-left).
     private(set) var selection: (screen: NSScreen, rect: NSRect)?
@@ -94,6 +98,8 @@ final class SnipController {
             overlayWindows.append(window)
             overlayViews.append(view)
         }
+        let front = NSWorkspace.shared.frontmostApplication
+        previousApp = front?.processIdentifier == ProcessInfo.processInfo.processIdentifier ? nil : front
         NSApp.activate()
         let mouseScreen = screenUnderMouse()
         if let i = overlayViews.firstIndex(where: { $0.screen == mouseScreen }) {
@@ -110,7 +116,10 @@ final class SnipController {
         tearDown()
     }
 
-    private func tearDown() {
+    /// Closes Snip. `returnFocus` is false when Preview is about to open with the capture (it takes focus).
+    private func tearDown(returnFocus: Bool = true) {
+        if returnFocus, isActive, let app = previousApp, !app.isTerminated { app.activate() }
+        previousApp = nil
         overlayWindows.forEach { $0.orderOut(nil) }
         overlayWindows = []
         overlayViews = []
@@ -258,7 +267,7 @@ final class SnipController {
             // Give the window server a moment to take Snip's windows off the screen.
             try? await Task.sleep(nanoseconds: 180_000_000)
             let image = await capture()
-            self.tearDown()
+            self.tearDown(returnFocus: image == nil || !self.settings.openInPreview)
             if let image { self.deliver(image) } else { NSSound.beep() }
         }
     }
@@ -269,6 +278,7 @@ final class SnipController {
               let display = content.displays.first(where: { $0.displayID == displayID }) else { return nil }
         let filter = SCContentFilter(display: display, excludingWindows: [])
         let scale = screen.backingScaleFactor
+        captureScale = scale
         let config = SCStreamConfiguration()
         // ScreenCaptureKit measures from the display's top-left corner.
         config.sourceRect = CGRect(x: rect.minX, y: screen.frame.height - rect.maxY, width: rect.width, height: rect.height)
@@ -287,6 +297,7 @@ final class SnipController {
         config.ignoreShadowsSingleWindow = !settings.windowShadow
         config.showsCursor = settings.showPointer
         let scale = CGFloat(filter.pointPixelScale)
+        captureScale = scale
         config.width = max(Int((filter.contentRect.width * scale).rounded()), 1)
         config.height = max(Int((filter.contentRect.height * scale).rounded()), 1)
         return try? await SCScreenshotManager.captureImage(contentFilter: filter, configuration: config)
@@ -394,7 +405,8 @@ final class SnipController {
     private func deliver(_ image: CGImage) {
         let rep = NSBitmapImageRep(cgImage: image)
         guard let png = rep.representation(using: .png, properties: [:]) else { return NSSound.beep() }
-        let pointSize = NSSize(width: CGFloat(image.width) / 2, height: CGFloat(image.height) / 2)
+        let scale = max(captureScale, 1)
+        let pointSize = NSSize(width: CGFloat(image.width) / scale, height: CGFloat(image.height) / scale)
         let nsImage = NSImage(cgImage: image, size: pointSize)
 
         if settings.copyToClipboard {
