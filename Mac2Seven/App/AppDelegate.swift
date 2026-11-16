@@ -97,6 +97,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let tab = i + 1 < args.count && !args[i + 1].hasPrefix("--") ? args[i + 1] : "general"
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { self.openSettings(tab: tab) }
         }
+        // Debug only: --hover-report writes the bars' Start buttons and hover state to a file every half second.
+        if let i = CommandLine.arguments.firstIndex(of: "--hover-report"), i + 1 < CommandLine.arguments.count {
+            let path = CommandLine.arguments[i + 1]
+            Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
+                Task { @MainActor in
+                    let starts = self.taskbar.startButtonRects().map { "\(Int($0.midX)),\(Int($0.midY))" }.joined(separator: " ")
+                    try? "starts \(starts)\nhover \(self.taskbar.hoverState())\n".write(toFile: path, atomically: true, encoding: .utf8)
+                }
+            }
+        }
         if CommandLine.arguments.contains("--calendar") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { self.taskbar.showCalendarForTesting() }
         }

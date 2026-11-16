@@ -47,7 +47,13 @@ final class TaskbarController {
     private let previewModel = PreviewModel()
     private let hoverModel = HoverModel()
     /// Where each hoverable element is on screen, keyed by its id.
-    private var hoverZones: [String: (target: PreviewTarget?, rect: NSRect)] = [:]
+    /// Where each hoverable element is on screen, one table per taskbar (one per display), keyed by element id.
+    /// Every bar has the same ids ("start", app paths…), so they must not share a table.
+    private var hoverZones: [[String: (target: PreviewTarget?, rect: NSRect)]] = []
+    /// Hover highlight state for each bar's buttons (the shared `hoverModel` is for the preview popup).
+    private var barHovers: [HoverModel] = []
+    /// The hovered element as "bar|id", or nil.
+    private var hoveredKey: String?
     private var pointerTimer: Timer?
     private var bars: [TaskbarPanel] = []
     private var previewPanel: TaskbarPanel?
@@ -79,7 +85,7 @@ final class TaskbarController {
             let isMenuClick = event.type == .rightMouseDown || event.modifierFlags.contains(.control)
             if isMenuClick, self.bars.contains(where: { $0.frame.contains(NSEvent.mouseLocation) }) {
                 self.hidePreviewNow()
-                self.previewSuppressedFor = self.hoverModel.hoveredID
+                self.previewSuppressedFor = self.hoveredKey
             }
             return event
         }
@@ -143,17 +149,29 @@ final class TaskbarController {
     private func rebuildBars(_ settings: TaskbarSettings) {
         bars.forEach { $0.orderOut(nil) }
         bars = []
-        hoverZones = [:]
+        hoverZones = []
+        barHovers = []
+        hoveredKey = nil
         guard settings.enabled else { return }
         let screens = settings.allDisplays ? NSScreen.screens : Array(NSScreen.screens.prefix(1))
         let height = TaskbarView.rowHeight * CGFloat(settings.rows)
-        for screen in screens {
-            let frame = NSRect(x: screen.frame.minX, y: screen.frame.minY, width: screen.frame.width, height: height)
+        var frames = screens.map { NSRect(x: $0.frame.minX, y: $0.frame.minY, width: $0.frame.width, height: height) }
+        #if DEBUG
+        // Debug only (--test-bars N): N taskbars stacked on the first display, to test several displays on one.
+        if let i = CommandLine.arguments.firstIndex(of: "--test-bars"), i + 1 < CommandLine.arguments.count,
+           let count = Int(CommandLine.arguments[i + 1]), let first = frames.first {
+            frames = (0..<count).map { first.offsetBy(dx: 0, dy: CGFloat($0) * 160) }
+        }
+        #endif
+        for (index, frame) in frames.enumerated() {
             let panel = TaskbarPanel(frame: frame)
-            let view = TaskbarView(barFrame: frame, actions: actions)
+            let barHover = HoverModel()
+            hoverZones.append([:])
+            barHovers.append(barHover)
+            let view = TaskbarView(barFrame: frame, actions: actions(for: index))
                 .environmentObject(prefs)
                 .environmentObject(tracker)
-                .environmentObject(hoverModel)
+                .environmentObject(barHover)
             let host = FirstClickHostingView(rootView: view)
             host.frame = NSRect(origin: .zero, size: frame.size)
             panel.contentView = host
@@ -164,11 +182,12 @@ final class TaskbarController {
         updateWindowKeeper(settings)
     }
 
-    private var actions: TaskbarActions {
+    private func actions(for bar: Int) -> TaskbarActions {
         TaskbarActions(
             start: { [weak self] rect in self?.hidePreviewNow(); self?.onStart(rect) },
             register: { [weak self] id, target, rect in
-                if rect.isEmpty { self?.hoverZones[id] = nil } else { self?.hoverZones[id] = (target, rect) }
+                guard let self, self.hoverZones.indices.contains(bar) else { return }
+                if rect.isEmpty { self.hoverZones[bar][id] = nil } else { self.hoverZones[bar][id] = (target, rect) }
             },
             showPreview: { [weak self] target, rect in self?.showPreview(target, at: rect) },
             hidePreview: { [weak self] in self?.hidePreviewNow() },
@@ -226,7 +245,7 @@ final class TaskbarController {
             } else {
                 set(card: nil, close: false)
             }
-            setHovered(nil, target: nil, rect: .zero, notify: false)
+            setHovered(bar: nil, id: nil, target: nil, rect: .zero, notify: false)
             return
         }
         if previewHovered {
@@ -235,18 +254,23 @@ final class TaskbarController {
             scheduleHide()
         }
 
-        guard bars.contains(where: { $0.frame.contains(point) }) else {
-            setHovered(nil, target: nil, rect: .zero)
+        guard let bar = bars.firstIndex(where: { $0.frame.contains(point) }), hoverZones.indices.contains(bar) else {
+            setHovered(bar: nil, id: nil, target: nil, rect: .zero)
             return
         }
-        let hit = hoverZones.first { $0.value.rect.contains(point) }
-        setHovered(hit?.key, target: hit?.value.target, rect: hit?.value.rect ?? .zero)
+        let hit = hoverZones[bar].first { $0.value.rect.contains(point) }
+        setHovered(bar: bar, id: hit?.key, target: hit?.value.target, rect: hit?.value.rect ?? .zero)
     }
 
-    private func setHovered(_ id: String?, target: PreviewTarget?, rect: NSRect, notify: Bool = true) {
-        guard hoverModel.hoveredID != id else { return }
-        hoverModel.hoveredID = id
-        if id != previewSuppressedFor { previewSuppressedFor = nil }
+    private func setHovered(bar: Int?, id: String?, target: PreviewTarget?, rect: NSRect, notify: Bool = true) {
+        let key = id.flatMap { id in bar.map { "\($0)|\(id)" } }
+        guard hoveredKey != key else { return }
+        hoveredKey = key
+        for (index, model) in barHovers.enumerated() {
+            let value = index == bar ? id : nil
+            if model.hoveredID != value { model.hoveredID = value }
+        }
+        if key != previewSuppressedFor { previewSuppressedFor = nil }
         if notify { hover(previewSuppressedFor == nil ? target : nil, rect) }
     }
 
@@ -378,10 +402,20 @@ final class TaskbarController {
     #if DEBUG
     /// Debug only (--demo --taskbar): opens the Start menu and the calendar from their real buttons.
     func stageDemo() {
-        if let start = hoverZones["start"]?.rect { onStart(start) }
+        if let start = hoverZones.first?["start"]?.rect { onStart(start) }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            if let clock = self?.hoverZones["clock"]?.rect { self?.toggleCalendar(below: clock) }
+            if let clock = self?.hoverZones.first?["clock"]?.rect { self?.toggleCalendar(below: clock) }
         }
+    }
+
+    /// Debug only: the Start button's screen rect on each bar, for tests.
+    func startButtonRects() -> [NSRect] {
+        hoverZones.compactMap { $0["start"]?.rect }
+    }
+
+    /// Debug only: which bar shows a hover highlight, and on what.
+    func hoverState() -> String {
+        barHovers.enumerated().map { "bar\($0.offset)=\($0.element.hoveredID ?? "-")" }.joined(separator: " ")
     }
 
     /// Debug only (--calendar): opens the calendar as if the clock at the bottom-right was clicked.
