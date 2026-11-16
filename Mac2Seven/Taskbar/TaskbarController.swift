@@ -69,6 +69,7 @@ final class TaskbarController {
     /// Opens the Start menu above the given button frame (screen coordinates).
     var onStart: (NSRect) -> Void = { _ in }
     var onOpenSettings: () -> Void = {}
+    var onSnip: () -> Void = {}
 
     init(prefs: Preferences) {
         self.prefs = prefs
@@ -192,7 +193,8 @@ final class TaskbarController {
             showPreview: { [weak self] target, rect in self?.showPreview(target, at: rect) },
             hidePreview: { [weak self] in self?.hidePreviewNow() },
             openSettings: { [weak self] in self?.onOpenSettings() },
-            calendar: { [weak self] rect in self?.toggleCalendar(below: rect) }
+            calendar: { [weak self] rect in self?.toggleCalendar(below: rect) },
+            snip: { [weak self] in self?.onSnip() }
         )
     }
 

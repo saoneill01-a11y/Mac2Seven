@@ -42,6 +42,7 @@ struct AllProgramsView: View {
 
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 1) {
+                    SnipRow()
                     ForEach(library.data.folders) { folder in
                         FolderTree(folder: folder, siblings: library.data.folders.map(\.id), depth: 0,
                                    expanded: $expanded, editing: $editing)
@@ -263,5 +264,39 @@ struct FolderTree: View {
         let name = draftName.trimmingCharacters(in: .whitespacesAndNewlines)
         if !name.isEmpty { library.renameFolder(folder.id, to: name) }
         editing = nil
+    }
+}
+
+/// Mac2Seven's own screenshot tool, listed first in All Programs.
+private struct SnipRow: View {
+    @EnvironmentObject var state: MenuState
+    @Environment(\.palette) private var p
+    @State private var hovering = false
+
+    var body: some View {
+        Button {
+            state.close()
+            state.snipHandler()
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "scissors")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(Color(red: 0.18, green: 0.5, blue: 0.88)))
+                Text("Mac2Seven Snip")
+                    .font(.system(size: 13))
+                    .foregroundStyle(p.text)
+                Spacer()
+            }
+            .padding(.leading, 17)
+            .padding(.vertical, 4)
+            .padding(.trailing, 8)
+            .background(RowHighlight(active: hovering))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering = $0 }
+        .help("Take a screenshot")
     }
 }

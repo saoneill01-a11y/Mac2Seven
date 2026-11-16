@@ -3,23 +3,33 @@ import Carbon.HIToolbox
 import SwiftUI
 
 /// A system-wide hotkey using the Carbon API (needs no Accessibility permission).
+/// Each instance has its own ID, so several shortcuts can be registered at once.
 final class HotKey {
     private var ref: EventHotKeyRef?
     private var handler: EventHandlerRef?
     private let action: () -> Void
+    private let id: UInt32
+    private static var nextID: UInt32 = 1
 
     init(keyCode: UInt32, modifiers: UInt32, action: @escaping () -> Void) {
         self.action = action
+        id = HotKey.nextID
+        HotKey.nextID += 1
         var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let me = Unmanaged.passUnretained(self).toOpaque()
-        InstallEventHandler(GetApplicationEventTarget(), { _, _, userData in
-            guard let userData else { return noErr }
+        InstallEventHandler(GetApplicationEventTarget(), { _, event, userData in
+            guard let userData, let event else { return OSStatus(eventNotHandledErr) }
             let hotKey = Unmanaged<HotKey>.fromOpaque(userData).takeUnretainedValue()
+            var pressed = EventHotKeyID()
+            GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                              nil, MemoryLayout<EventHotKeyID>.size, nil, &pressed)
+            // Every handler sees every hotkey; only the one that was pressed acts.
+            guard pressed.id == hotKey.id else { return OSStatus(eventNotHandledErr) }
             DispatchQueue.main.async { hotKey.action() }
             return noErr
         }, 1, &spec, me, &handler)
-        let id = EventHotKeyID(signature: OSType(0x4D325337), id: 1) // "M2S7"
-        RegisterEventHotKey(keyCode, modifiers, id, GetApplicationEventTarget(), 0, &ref)
+        let hotKeyID = EventHotKeyID(signature: OSType(0x4D325337), id: id) // "M2S7"
+        RegisterEventHotKey(keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &ref)
     }
 
     deinit {

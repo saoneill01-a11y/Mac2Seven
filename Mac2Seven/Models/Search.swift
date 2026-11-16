@@ -23,6 +23,8 @@ final class MenuState: ObservableObject {
     var closeHandler: () -> Void = {}
     /// Opens the Settings window on a tab ("general", "appearance", "places", "organize", "history").
     var openSettingsHandler: (String) -> Void = { _ in }
+    /// Starts Mac2Seven Snip (from the Start menu).
+    var snipHandler: () -> Void = {}
 
     func openSettings(_ tab: String) { openSettingsHandler(tab) }
 

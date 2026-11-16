@@ -17,6 +17,9 @@ struct SettingsView: View {
             TaskbarSettingsView()
                 .tabItem { Label("Taskbar", systemImage: "dock.rectangle") }
                 .tag("taskbar")
+            SnipSettingsView()
+                .tabItem { Label("Screenshots", systemImage: "scissors") }
+                .tag("screenshots")
             PlacesSettings()
                 .tabItem { Label("Places", systemImage: "folder") }
                 .tag("places")
@@ -111,6 +114,8 @@ struct GeneralSettings: View {
 struct HotkeyRecorder: View {
     @Binding var spec: HotkeySpec
     @Binding var isRecording: Bool
+    /// What Reset goes back to.
+    var defaultSpec: HotkeySpec = .default
     @State private var monitor: Any?
 
     var body: some View {
@@ -121,8 +126,8 @@ struct HotkeyRecorder: View {
                 Text(isRecording ? "Press keys…" : spec.display)
                     .frame(minWidth: 110)
             }
-            if spec != .default && !isRecording {
-                Button("Reset") { spec = .default }
+            if spec != defaultSpec && !isRecording {
+                Button("Reset") { spec = defaultSpec }
                     .buttonStyle(.link)
             }
         }
