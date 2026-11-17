@@ -87,7 +87,7 @@ struct TaskbarView: View {
                 .frame(width: Self.trayWidth)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(TaskbarBackground(dark: dark))
+        .background(TaskbarBackground(dark: dark, solid: Dock.isReserving))
         .contextMenu {
             Button("Taskbar Settings…") { actions.openSettings() }
         }
@@ -206,11 +206,13 @@ extension EnvironmentValues {
 
 struct TaskbarBackground: View {
     let dark: Bool
+    /// Opaque, so the Dock underneath doesn't show through.
+    var solid = false
 
     var body: some View {
         ZStack(alignment: .top) {
             VisualEffect(material: .hudWindow)
-            (dark ? Color(white: 0.11).opacity(0.78) : Color(white: 0.95).opacity(0.82))
+            (dark ? Color(white: 0.11).opacity(solid ? 1 : 0.78) : Color(white: 0.95).opacity(solid ? 1 : 0.82))
             Rectangle().fill(dark ? Color.white.opacity(0.10) : Color.black.opacity(0.12)).frame(height: 1)
         }
     }

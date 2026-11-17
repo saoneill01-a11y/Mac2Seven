@@ -42,7 +42,7 @@ final class WindowTracker: ObservableObject {
     /// The order set by dragging buttons; apps not in it keep their default place after the ones that are.
     var orderPaths: [String] = [] { didSet { if orderPaths != oldValue { refresh() } } }
     /// Called on the polling queue with the focused window so it can be moved clear of the taskbar.
-    var adjustFocusedWindow: ((AXUIElement) -> Void)?
+    var adjustFocusedWindow: ((AXUIElement) -> Void)? { didSet { watchFrontmostResizes() } }
 
     private let queue = DispatchQueue(label: "Mac2Seven.windows", qos: .userInitiated)
     private var timer: Timer?
@@ -53,6 +53,11 @@ final class WindowTracker: ObservableObject {
     private var polling = false
     private let log = Logger(subsystem: "com.csioly.Mac2Seven", category: "taskbar")
     private var lastSummary = ""
+    /// Tells us the moment a window of the frontmost app is resized, so a window that was just zoomed
+    /// to fill the screen is pulled clear of the taskbar right away instead of on the next poll.
+    private var resizeObserver: AXObserver?
+    private var resizeObserverPID: pid_t?
+    private var pendingResize: DispatchWorkItem?
 
     func start() {
         guard timer == nil else { return }
@@ -64,9 +69,13 @@ final class WindowTracker: ObservableObject {
                      NSWorkspace.didActivateApplicationNotification, NSWorkspace.didHideApplicationNotification,
                      NSWorkspace.didUnhideApplicationNotification, NSWorkspace.activeSpaceDidChangeNotification] {
             observers.append(nc.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.refresh() }
+                Task { @MainActor in
+                    self?.refresh()
+                    self?.watchFrontmostResizes()
+                }
             })
         }
+        watchFrontmostResizes()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refresh() }
         }
@@ -78,6 +87,49 @@ final class WindowTracker: ObservableObject {
         timer = nil
         observers.forEach { NSWorkspace.shared.notificationCenter.removeObserver($0) }
         observers = []
+        stopWatchingResizes()
+    }
+
+    // MARK: Watching resizes
+
+    private func watchFrontmostResizes() {
+        guard timer != nil, adjustFocusedWindow != nil, AXIsProcessTrusted(),
+              let app = NSWorkspace.shared.frontmostApplication,
+              app.processIdentifier != ProcessInfo.processInfo.processIdentifier
+        else { return stopWatchingResizes() }
+        let pid = app.processIdentifier
+        guard pid != resizeObserverPID else { return }
+        stopWatchingResizes()
+        var observer: AXObserver?
+        let callback: AXObserverCallback = { _, element, _, refcon in
+            guard let refcon else { return }
+            let tracker = Unmanaged<WindowTracker>.fromOpaque(refcon).takeUnretainedValue()
+            MainActor.assumeIsolated { tracker.windowResized(element) }
+        }
+        guard AXObserverCreate(pid, callback, &observer) == .success, let observer else { return }
+        let refcon = Unmanaged.passUnretained(self).toOpaque()
+        AXObserverAddNotification(observer, AXUIElementCreateApplication(pid), kAXWindowResizedNotification as CFString, refcon)
+        CFRunLoopAddSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        resizeObserver = observer
+        resizeObserverPID = pid
+    }
+
+    private func stopWatchingResizes() {
+        if let observer = resizeObserver {
+            CFRunLoopRemoveSource(CFRunLoopGetMain(), AXObserverGetRunLoopSource(observer), .defaultMode)
+        }
+        resizeObserver = nil
+        resizeObserverPID = nil
+    }
+
+    /// Waits until the window stops changing (the zoom animation has finished) so Mac2Seven never resizes
+    /// it mid-animation.
+    private func windowResized(_ window: AXUIElement) {
+        guard let adjust = adjustFocusedWindow else { return }
+        pendingResize?.cancel()
+        let work = DispatchWorkItem { [queue] in queue.async { adjust(window) } }
+        pendingResize = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
     }
 
     /// Shows the system prompt that sends the user to Privacy & Security → Accessibility.

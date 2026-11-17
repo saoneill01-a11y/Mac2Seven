@@ -146,6 +146,11 @@ final class TaskbarController {
     private func apply(_ settings: TaskbarSettings) {
         tracker.pinnedPaths = settings.pinned
         tracker.orderPaths = settings.order
+        // With Keep windows clear on, a hidden Dock sits under the taskbar at its height instead, so macOS
+        // keeps zoomed and filled windows above the bar.
+        let reserve: CGFloat? = settings.enabled && settings.keepWindowsClear
+            ? TaskbarView.rowHeight * CGFloat(settings.rows) : nil
+        if lastSettings == nil { Dock.reserveHeight = reserve } else { Dock.reserveHeightChanged(to: reserve) }
         // Turning the taskbar off or on while running: show the Dock, or hide it again if the user chose that.
         if let last = lastSettings, last.enabled != settings.enabled {
             if settings.enabled { Dock.rehideAtLaunch(taskbarOn: true) } else { Dock.restoreForQuit() }
@@ -242,7 +247,9 @@ final class TaskbarController {
 
     // MARK: Keeping windows clear of the bar
 
-    /// Shrinks the focused window when its bottom edge is behind the taskbar.
+    /// Shrinks the focused window when macOS sized it to fill the screen (double-clicking the title bar,
+    /// Zoom, Fill or tiling) and that put its bottom edge behind the taskbar. A window the user dragged or
+    /// resized there by hand is left alone.
     private func updateWindowKeeper(_ settings: TaskbarSettings) {
         guard settings.enabled, settings.keepWindowsClear, let primary = NSScreen.screens.first else {
             tracker.adjustFocusedWindow = nil
@@ -252,18 +259,24 @@ final class TaskbarController {
         let primaryHeight = primary.frame.maxY
         let height = TaskbarView.rowHeight * CGFloat(settings.rows)
         let screens = settings.allDisplays ? NSScreen.screens : [primary]
-        let zones: [(screen: CGRect, barTop: CGFloat)] = screens.map { screen in
+        let zones: [(screen: CGRect, usable: CGRect, barTop: CGFloat)] = screens.map { screen in
             let f = screen.frame
+            let v = screen.visibleFrame
             let ax = CGRect(x: f.minX, y: primaryHeight - f.maxY, width: f.width, height: f.height)
-            return (ax, ax.maxY - height)
+            let usable = CGRect(x: v.minX, y: primaryHeight - v.maxY, width: v.width, height: v.height)
+            return (ax, usable, ax.maxY - height)
         }
         tracker.adjustFocusedWindow = { window in
             if WindowTracker.bool(window, "AXFullScreen") == true { return }
             guard let frame = WindowTracker.frame(window),
                   let zone = zones.first(where: { $0.screen.contains(CGPoint(x: frame.midX, y: frame.minY + 10)) })
             else { return }
-            // Leave windows that are mostly below the bar, or tiny, alone.
-            guard frame.maxY > zone.barTop + 1, frame.minY < zone.barTop - 150 else { return }
+            // Only a window that runs from the top of the usable area to its bottom, the way macOS sizes
+            // a filled, zoomed or tiled window.
+            let slack: CGFloat = 6
+            guard abs(frame.minY - zone.usable.minY) <= slack,
+                  frame.maxY >= zone.usable.maxY - slack,
+                  frame.maxY > zone.barTop + 1 else { return }
             WindowTracker.setSize(window, CGSize(width: frame.width, height: zone.barTop - frame.minY))
         }
     }

@@ -58,7 +58,7 @@ struct TaskbarSettingsView: View {
                 }
                 if let dockError { Text(dockError).font(.caption).foregroundStyle(.red) }
             } footer: {
-                Text("Windows that reach behind the taskbar are made shorter. Hiding the Dock keeps it from popping up over the taskbar when the pointer reaches the bottom of the screen. Switch apps with the taskbar or ⌘Tab instead.")
+                Text("Windows that macOS zooms or fills to the bottom of the screen stop at the taskbar. With the Dock hidden, Mac2Seven sizes the Dock to the taskbar and keeps it underneath, so macOS itself stops windows there with its usual animation; windows you move by hand can still go behind the bar. Hiding the Dock also keeps it from popping up over the taskbar. Switch apps with the taskbar or ⌘Tab instead.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 
@@ -186,7 +186,21 @@ enum Dock {
     /// Mac2Seven isn't running and is hidden again when it starts.
     private static let wantsHiddenKey = "dockHiddenByMac2Seven"
 
+    /// The Dock is kept out of the way by showing it under the taskbar, sized to the bar, instead of hiding it.
+    /// macOS then keeps zoomed, filled and tiled windows above it (and so above the taskbar), with its own
+    /// smooth animation. The Dock's own look (size, magnification, position) is saved and put back later.
+    private static let reservingKey = "dockReservingForTaskbar"
+    private static let savedLookKey = "dockSavedLook"
+    private static let lookKeys: [(key: String, type: String)] = [("tilesize", "-float"), ("magnification", "-bool"),
+                                                                  ("orientation", "-string")]
+
+    /// The taskbar's height when the Dock should hold that space (Keep windows clear of the taskbar is on),
+    /// or nil to hide the Dock instead. Set by the taskbar before the Dock is hidden.
+    static var reserveHeight: CGFloat?
+
     static var wantsHidden: Bool { UserDefaults.standard.bool(forKey: wantsHiddenKey) }
+    /// Mac2Seven has put the Dock under the taskbar (the taskbar draws a solid background then).
+    static var isReserving: Bool { UserDefaults.standard.bool(forKey: reservingKey) }
 
     /// The Hide the Dock / Show the Dock Again buttons.
     @discardableResult
@@ -199,6 +213,7 @@ enum Dock {
     /// either. The choice is kept, and the Dock is hidden again when Mac2Seven starts.
     static func restoreForQuit() {
         guard wantsHidden && isKeptAway else { return }
+        restoreLook()
         run("/usr/bin/defaults", ["delete", "com.apple.dock", "autohide-delay"])
         run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide", "-bool", "false"])
         run("/usr/bin/killall", ["Dock"])
@@ -222,7 +237,15 @@ enum Dock {
     }
 
     static var isKeptAway: Bool {
-        ((value("autohide-delay") as? NSNumber)?.doubleValue ?? 0) >= 100 && (value("autohide") as? Bool ?? false)
+        let hidden = ((value("autohide-delay") as? NSNumber)?.doubleValue ?? 0) >= 100 && (value("autohide") as? Bool ?? false)
+        return hidden || (isReserving && !(value("autohide") as? Bool ?? false))
+    }
+
+    /// The taskbar's height or setting changed: if the Dock is kept away, switch to the right way of doing it.
+    static func reserveHeightChanged(to height: CGFloat?) {
+        guard height != reserveHeight else { return }
+        reserveHeight = height
+        if wantsHidden && isKeptAway { setKeptAway(true, recordOriginal: false) }
     }
 
     @discardableResult
@@ -232,9 +255,15 @@ enum Dock {
             if recordOriginal || UserDefaults.standard.object(forKey: autohideWasOnKey) == nil {
                 UserDefaults.standard.set(value("autohide") as? Bool ?? false, forKey: autohideWasOnKey)
             }
-            ok = run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide", "-bool", "true"])
-            ok = ok && run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide-delay", "-float", String(longDelay)])
+            if let height = reserveHeight {
+                ok = reserve(height)
+            } else {
+                restoreLook()
+                ok = run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide", "-bool", "true"])
+                ok = ok && run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide-delay", "-float", String(longDelay)])
+            }
         } else {
+            restoreLook()
             // Deleting a key that isn't there fails harmlessly, so its result isn't checked.
             run("/usr/bin/defaults", ["delete", "com.apple.dock", "autohide-delay"])
             let wasOn = UserDefaults.standard.bool(forKey: autohideWasOnKey)
@@ -242,7 +271,72 @@ enum Dock {
         }
         // The Dock reads its settings when it starts; it restarts on its own right away.
         run("/usr/bin/killall", ["Dock"])
+        if away, let height = reserveHeight { calibrate(height, attempt: 0) }
         return ok
+    }
+
+    // MARK: Dock under the taskbar
+
+    private static func tileSizeKey(_ height: CGFloat) -> String { "dockTileSizeFor\(Int(height.rounded()))" }
+
+    private static func reserve(_ height: CGFloat) -> Bool {
+        let defaults = UserDefaults.standard
+        if defaults.dictionary(forKey: savedLookKey) == nil {
+            var look: [String: Any] = [:]
+            for item in lookKeys { if let v = value(item.key) { look[item.key] = v } }
+            defaults.set(look, forKey: savedLookKey)
+        }
+        defaults.set(true, forKey: reservingKey)
+        let saved = defaults.double(forKey: tileSizeKey(height))
+        let tile = saved > 0 ? saved : min(max(height - 14, 16), 128)
+        run("/usr/bin/defaults", ["delete", "com.apple.dock", "autohide-delay"])
+        var ok = run("/usr/bin/defaults", ["write", "com.apple.dock", "autohide", "-bool", "false"])
+        ok = ok && run("/usr/bin/defaults", ["write", "com.apple.dock", "magnification", "-bool", "false"])
+        ok = ok && run("/usr/bin/defaults", ["write", "com.apple.dock", "orientation", "-string", "bottom"])
+        ok = ok && run("/usr/bin/defaults", ["write", "com.apple.dock", "tilesize", "-float", String(tile)])
+        return ok
+    }
+
+    /// Puts back the Dock's own size, magnification and position after it was under the taskbar.
+    private static func restoreLook() {
+        let defaults = UserDefaults.standard
+        defaults.set(false, forKey: reservingKey)
+        guard let look = defaults.dictionary(forKey: savedLookKey) else { return }
+        for item in lookKeys {
+            if let v = look[item.key] {
+                let text: String
+                if item.type == "-bool" { text = ((v as? NSNumber)?.boolValue ?? false) ? "true" : "false" } else { text = "\(v)" }
+                run("/usr/bin/defaults", ["write", "com.apple.dock", item.key, item.type, text])
+            } else {
+                run("/usr/bin/defaults", ["delete", "com.apple.dock", item.key])
+            }
+        }
+        defaults.removeObject(forKey: savedLookKey)
+    }
+
+    /// The Dock's height isn't exactly its icon size, so measure the space it holds once it has restarted
+    /// and adjust the icon size until it matches the taskbar (rounding up, so windows never reach under it).
+    /// The result is remembered, so later launches get it right the first time.
+    private static func calibrate(_ height: CGFloat, attempt: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            guard isReserving, reserveHeight == height, attempt < 4 else { return }
+            let insets = NSScreen.screens.map { $0.visibleFrame.minY - $0.frame.minY }.filter { $0 > 8 }
+            guard let inset = insets.first else { return calibrate(height, attempt: attempt + 1) }
+            let tile = ((value("tilesize") as? NSNumber)?.doubleValue) ?? Double(height - 14)
+            let diff = Double(height - inset)
+            if diff <= 0 && diff > -1.5 {
+                UserDefaults.standard.set(tile, forKey: tileSizeKey(height))
+                return
+            }
+            let next = min(max((tile + diff).rounded(.up), 16), 128)
+            guard next != tile else {
+                UserDefaults.standard.set(tile, forKey: tileSizeKey(height))
+                return
+            }
+            run("/usr/bin/defaults", ["write", "com.apple.dock", "tilesize", "-float", String(next)])
+            run("/usr/bin/killall", ["Dock"])
+            calibrate(height, attempt: attempt + 1)
+        }
     }
 
     @discardableResult
