@@ -148,7 +148,7 @@ final class TaskbarController {
         tracker.orderPaths = settings.order
         // With Keep windows clear on, a hidden Dock sits under the taskbar at its height instead, so macOS
         // keeps zoomed and filled windows above the bar.
-        let reserve: CGFloat? = settings.enabled && settings.keepWindowsClear
+        let reserve: CGFloat? = settings.enabled && settings.keepWindowsClear && settings.dockUnderTaskbar
             ? TaskbarView.rowHeight * CGFloat(settings.rows) : nil
         if lastSettings == nil { Dock.reserveHeight = reserve } else { Dock.reserveHeightChanged(to: reserve) }
         // Turning the taskbar off or on while running: show the Dock, or hide it again if the user chose that.

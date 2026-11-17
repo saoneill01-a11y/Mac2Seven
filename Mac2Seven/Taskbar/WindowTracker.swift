@@ -36,6 +36,8 @@ final class WindowTracker: ObservableObject {
     /// The focused window of the frontmost app.
     @Published private(set) var activeWindow: CGWindowID?
     @Published private(set) var hasAccessibility = AXIsProcessTrusted()
+    /// Notification badges (the red bubble with a count) by app path, read from the Dock.
+    @Published private(set) var badges: [String: String] = [:]
 
     /// Paths of pinned apps, in taskbar order.
     var pinnedPaths: [String] = [] { didSet { if pinnedPaths != oldValue { refresh() } } }
@@ -129,7 +131,7 @@ final class WindowTracker: ObservableObject {
         pendingResize?.cancel()
         let work = DispatchWorkItem { [queue] in queue.async { adjust(window) } }
         pendingResize = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: work)
     }
 
     /// Shows the system prompt that sends the user to Privacy & Security → Accessibility.
@@ -163,8 +165,10 @@ final class WindowTracker: ObservableObject {
         let adjust = adjustFocusedWindow
         let known = apps.flatMap(\.windows)
         let knownElements = elements
+        let dockPID = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first?.processIdentifier
 
         queue.async { [weak self] in
+            let badges = trusted ? dockPID.map(Self.dockBadges) ?? [:] : [:]
             var windows: [pid_t: [TaskWindow]] = [:]
             var elements: [CGWindowID: AXUIElement] = [:]
             var focused: CGWindowID?
@@ -208,6 +212,7 @@ final class WindowTracker: ObservableObject {
                     self.log.notice("Window scan: \(summary, privacy: .public)")
                 }
                 self.elements = elements
+                if badges != self.badges { self.badges = badges }
                 self.activeWindow = focused
                 self.rebuild(snapshot: snapshot, windows: windows)
             }
@@ -424,6 +429,29 @@ final class WindowTracker: ObservableObject {
     nonisolated static func windowID(_ window: AXUIElement) -> CGWindowID? {
         var id: CGWindowID = 0
         return _AXUIElementGetWindow(window, &id) == .success && id != 0 ? id : nil
+    }
+
+    /// The Dock shows each app's badge as the status label of its Dock item; apps only set it on the Dock tile,
+    /// so the Dock is the one place to read it.
+    nonisolated static func dockBadges(_ pid: pid_t) -> [String: String] {
+        let dock = AXUIElementCreateApplication(pid)
+        var result: [String: String] = [:]
+        for list in children(dock) {
+            for item in children(list) {
+                guard let label = string(item, "AXStatusLabel"), !label.isEmpty else { continue }
+                var value: CFTypeRef?
+                guard AXUIElementCopyAttributeValue(item, kAXURLAttribute as CFString, &value) == .success,
+                      let url = value as? URL ?? (value as? NSURL).map({ $0 as URL }) else { continue }
+                result[url.path] = label
+            }
+        }
+        return result
+    }
+
+    nonisolated private static func children(_ element: AXUIElement) -> [AXUIElement] {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &value) == .success else { return [] }
+        return value as? [AXUIElement] ?? []
     }
 
     nonisolated static func string(_ element: AXUIElement, _ attribute: String) -> String? {

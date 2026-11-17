@@ -150,6 +150,9 @@ struct TaskbarSettings: Codable, Equatable {
     var buttons: TaskbarButtons = .combine
     var allDisplays = true
     var keepWindowsClear = true
+    /// With the Dock hidden: keep it under the taskbar, sized to the bar, so macOS stops zoomed windows at
+    /// the bar with its own animation. Its name labels can show when the pointer is over the bar.
+    var dockUnderTaskbar = false
     var showPreviews = true
     var hideWindowless = false
     var calendarStyle: CalendarStyle = .glass
@@ -169,6 +172,7 @@ struct TaskbarSettings: Codable, Equatable {
         buttons = (try? c.decodeIfPresent(TaskbarButtons.self, forKey: .buttons)) ?? d.buttons
         allDisplays = (try? c.decodeIfPresent(Bool.self, forKey: .allDisplays)) ?? d.allDisplays
         keepWindowsClear = (try? c.decodeIfPresent(Bool.self, forKey: .keepWindowsClear)) ?? d.keepWindowsClear
+        dockUnderTaskbar = (try? c.decodeIfPresent(Bool.self, forKey: .dockUnderTaskbar)) ?? d.dockUnderTaskbar
         showPreviews = (try? c.decodeIfPresent(Bool.self, forKey: .showPreviews)) ?? d.showPreviews
         hideWindowless = (try? c.decodeIfPresent(Bool.self, forKey: .hideWindowless)) ?? d.hideWindowless
         calendarStyle = (try? c.decodeIfPresent(CalendarStyle.self, forKey: .calendarStyle)) ?? d.calendarStyle

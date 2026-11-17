@@ -46,6 +46,8 @@ struct TaskbarSettingsView: View {
             Section {
                 Toggle("Show window previews on hover", isOn: settings.showPreviews)
                 Toggle("Keep windows clear of the taskbar", isOn: settings.keepWindowsClear)
+                Toggle("Smooth zoom: keep the hidden Dock under the taskbar", isOn: settings.dockUnderTaskbar)
+                    .disabled(!prefs.data.taskbar.keepWindowsClear || !dockAway)
                 LabeledContent("Mac Dock") {
                     if dockAway {
                         HStack {
@@ -58,7 +60,7 @@ struct TaskbarSettingsView: View {
                 }
                 if let dockError { Text(dockError).font(.caption).foregroundStyle(.red) }
             } footer: {
-                Text("Windows that macOS zooms or fills to the bottom of the screen stop at the taskbar. With the Dock hidden, Mac2Seven sizes the Dock to the taskbar and keeps it underneath, so macOS itself stops windows there with its usual animation; windows you move by hand can still go behind the bar. Hiding the Dock also keeps it from popping up over the taskbar. Switch apps with the taskbar or ⌘Tab instead.")
+                Text("Windows that macOS zooms or fills to the bottom of the screen are shortened to stop at the taskbar; windows you move by hand can still go behind it. Smooth zoom keeps the hidden Dock under the taskbar, sized to the bar, so macOS stops windows there with its usual animation, but the Dock's app names can pop up when the pointer is over the bar. Hiding the Dock keeps it from popping up over the taskbar. Switch apps with the taskbar or ⌘Tab instead.")
                     .font(.caption).foregroundStyle(.secondary)
             }
 

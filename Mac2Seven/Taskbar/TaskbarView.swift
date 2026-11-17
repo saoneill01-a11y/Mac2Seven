@@ -386,6 +386,21 @@ struct TaskButtonView: View {
                     .resizable()
                     .interpolation(.high)
                     .frame(width: labeled ? 24 : 28, height: labeled ? 24 : 28)
+                    .overlay(alignment: .topTrailing) {
+                        // The app's notification badge, as on its Dock icon (on its first button when windows are separate).
+                        if let badge = tracker.badges[app.path], button.window == nil || button.window?.id == app.windows.first?.id {
+                            Text(badge)
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .padding(.horizontal, 4)
+                                .frame(minWidth: 15, minHeight: 15)
+                                .background(Capsule().fill(Color.red))
+                                .overlay(Capsule().strokeBorder(Color.white.opacity(0.8), lineWidth: 1))
+                                .fixedSize()
+                                .offset(x: 7, y: -6)
+                        }
+                    }
                 if labeled {
                     Text(button.window?.title ?? app.name)
                         .scaledFont(size: 12)
