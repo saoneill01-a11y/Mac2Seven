@@ -414,6 +414,51 @@ final class TaskbarController {
         }
         if key != previewSuppressedFor { previewSuppressedFor = nil }
         if notify { hover(previewSuppressedFor == nil ? target : nil, rect) }
+        if notify && previewSuppressedFor == nil { updateNameTip(target, rect) } else { hideNameTip() }
+    }
+
+    // MARK: Name tip
+
+    private var tipPanel: TaskbarPanel?
+    private var tipWork: DispatchWorkItem?
+
+    /// An app button with nothing to preview (not open, or no windows) shows the app's name above it after
+    /// a moment, like a tooltip. (SwiftUI's own tooltips don't appear in the taskbar's background panels.)
+    private func updateNameTip(_ target: PreviewTarget?, _ rect: NSRect) {
+        hideNameTip()
+        guard case .app(let path)? = target, !isDraggingButton else { return }
+        let hasPreview = prefs.data.taskbar.showPreviews && !PreviewView.windows(for: .app(path), in: tracker.apps).isEmpty
+        guard !hasPreview else { return }
+        let name = tracker.apps.first { $0.path == path }?.name
+            ?? (FileManager.default.displayName(atPath: path) as NSString).deletingPathExtension
+        let work = DispatchWorkItem { [weak self] in self?.showNameTip(name, above: rect) }
+        tipWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: work)
+    }
+
+    private func showNameTip(_ name: String, above rect: NSRect) {
+        let font = NSFont.systemFont(ofSize: 12)
+        let textWidth = ceil((name as NSString).size(withAttributes: [.font: font]).width)
+        let size = NSSize(width: textWidth + 20, height: 24)
+        guard let screen = NSScreen.screens.first(where: { $0.frame.intersects(rect) }) ?? NSScreen.main else { return }
+        let x = min(max(rect.midX - size.width / 2, screen.frame.minX + 4), screen.frame.maxX - size.width - 4)
+        let panel = tipPanel ?? {
+            let p = TaskbarPanel(frame: .zero)
+            p.level = .popUpMenu
+            p.hasShadow = true
+            p.ignoresMouseEvents = true
+            tipPanel = p
+            return p
+        }()
+        panel.contentView = FirstClickHostingView(rootView: NameTip(name: name))
+        panel.setFrame(NSRect(x: x, y: rect.maxY + 8, width: size.width, height: size.height), display: true)
+        panel.orderFrontRegardless()
+    }
+
+    private func hideNameTip() {
+        tipWork?.cancel()
+        tipWork = nil
+        tipPanel?.orderOut(nil)
     }
 
     private func set(card: CGWindowID?, close: Bool) {
@@ -487,6 +532,7 @@ final class TaskbarController {
     }
 
     func hidePreviewNow() {
+        hideNameTip()
         hoverWork?.cancel()
         hideWork?.cancel()
         previewHovered = false
@@ -613,5 +659,20 @@ final class TaskbarController {
         panel.contentView = FirstClickHostingView(rootView: view)
         previewPanel = panel
         return panel
+    }
+}
+
+/// The app name shown above a taskbar button that has no window preview.
+private struct NameTip: View {
+    let name: String
+
+    var body: some View {
+        Text(name)
+            .font(.system(size: 12))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color(white: 0.16).opacity(0.96)))
+            .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(Color.white.opacity(0.15), lineWidth: 1))
     }
 }
