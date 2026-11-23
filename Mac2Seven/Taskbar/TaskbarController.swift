@@ -450,8 +450,10 @@ final class TaskbarController {
             tipPanel = p
             return p
         }()
-        panel.contentView = FirstClickHostingView(rootView: NameTip(name: name))
+        let host = FirstClickHostingView(rootView: NameTip(name: name))
+        panel.contentView = host
         panel.setFrame(NSRect(x: x, y: rect.maxY + 8, width: size.width, height: size.height), display: true)
+        host.frame = NSRect(origin: .zero, size: size)
         panel.orderFrontRegardless()
     }
 
@@ -486,7 +488,8 @@ final class TaskbarController {
         hideWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self, !self.previewHovered else { return }
-            self.hidePreviewNow()
+            // The name tip follows the hovered button on its own; this only closes the preview.
+            self.hidePreviewOnly()
         }
         hideWork = work
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
@@ -498,7 +501,8 @@ final class TaskbarController {
 
     func showPreview(_ target: PreviewTarget, at rect: NSRect) {
         let items = PreviewView.windows(for: target, in: tracker.apps)
-        guard !items.isEmpty else { return hidePreviewNow() }
+        // Nothing to preview: close only the preview. The app's name tip (timed the same) must stay.
+        guard !items.isEmpty else { return hidePreviewOnly() }
         hideWork?.cancel()
         previewModel.target = target
         previewAnchor = rect
@@ -533,6 +537,10 @@ final class TaskbarController {
 
     func hidePreviewNow() {
         hideNameTip()
+        hidePreviewOnly()
+    }
+
+    private func hidePreviewOnly() {
         hoverWork?.cancel()
         hideWork?.cancel()
         previewHovered = false
