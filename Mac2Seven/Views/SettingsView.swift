@@ -271,6 +271,9 @@ struct PlacesSettings: View {
                 Button("Add Folder…", action: addFolder)
                 Button("Add App…", action: addApp)
                 Button("Add Separator") { insert([.separator()]) }
+                if !prefs.data.places.contains(where: \.isSnip) {
+                    Button("Add Snipping Tool") { insert([.snip()]) }
+                }
                 Spacer()
                 Button("Remove", role: .destructive) {
                     prefs.data.places.removeAll { $0.id == selection }
@@ -379,24 +382,26 @@ struct PlaceEditorRow: View {
             .padding(.vertical, 4)
         } else {
             HStack(spacing: 8) {
-                Image(nsImage: IconCache.icon(place.path))
+                Image(nsImage: IconCache.icon(place.iconPath))
                     .resizable()
                     .frame(width: 18, height: 18)
                 TextField("Name", text: $place.title)
                     .textFieldStyle(.plain)
                     .fontWeight(place.bold ? .semibold : .regular)
                     .frame(maxWidth: 170, alignment: .leading)
-                Text(place.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
+                Text(place.isSnip ? "Mac2Seven Snip" : place.path.replacingOccurrences(of: NSHomeDirectory(), with: "~"))
                     .font(.caption)
-                    .foregroundStyle(FileManager.default.fileExists(atPath: place.path) ? Color.secondary : Color.red)
+                    .foregroundStyle(place.isSnip || FileManager.default.fileExists(atPath: place.path) ? Color.secondary : Color.red)
                     .lineLimit(1)
                     .truncationMode(.middle)
                 Spacer(minLength: 0)
             }
             .contextMenu {
                 Toggle("Bold", isOn: $place.bold)
-                Button("Show in Finder") {
-                    NSWorkspace.shared.activateFileViewerSelecting([place.url])
+                if !place.isSnip {
+                    Button("Show in Finder") {
+                        NSWorkspace.shared.activateFileViewerSelecting([place.url])
+                    }
                 }
             }
         }

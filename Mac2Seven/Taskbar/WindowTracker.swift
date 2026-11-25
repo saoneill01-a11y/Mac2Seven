@@ -377,6 +377,82 @@ final class WindowTracker: ObservableObject {
         refreshSoon()
     }
 
+    static let finderPath = "/System/Library/CoreServices/Finder.app"
+
+    /// The extra items in Finder's Dock menu, by their titles in Finder's own menus.
+    static let finderMenuItems = ["New Smart Folder", "Find…", "Connect to Server…", "Go to Folder…"]
+
+    /// Brings Finder forward and chooses one of its menu items (found through Accessibility, by title).
+    func pressFinderMenuItem(_ title: String) {
+        guard let finder = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").first else {
+            return NSSound.beep()
+        }
+        finder.activate()
+        let pid = finder.processIdentifier
+        // Give Finder a moment to come forward, so the window or sheet opens in front.
+        queue.asyncAfter(deadline: .now() + 0.15) {
+            let axApp = AXUIElementCreateApplication(pid)
+            guard let bar = Self.element(axApp, kAXMenuBarAttribute), let item = Self.findMenuItem(title, in: bar, depth: 0) else {
+                DispatchQueue.main.async { NSSound.beep() }
+                return
+            }
+            AXUIElementPerformAction(item, kAXPressAction as CFString)
+        }
+    }
+
+    /// Menu titles may or may not end in an ellipsis ("Find" vs "Find…"); compare without it.
+    nonisolated private static func bare(_ title: String) -> String {
+        var t = title.trimmingCharacters(in: .whitespaces)
+        while t.hasSuffix("…") || t.hasSuffix(".") { t.removeLast() }
+        return t
+    }
+
+    nonisolated private static func findMenuItem(_ title: String, in element: AXUIElement, depth: Int) -> AXUIElement? {
+        guard depth < 4 else { return nil }
+        for child in children(element) {
+            if depth > 0, let name = string(child, kAXTitleAttribute), bare(name) == bare(title) { return child }
+            if let found = findMenuItem(title, in: child, depth: depth + 1) { return found }
+        }
+        return nil
+    }
+
+    func forceQuit(_ app: TaskApp) {
+        guard let pid = app.pid else { return }
+        NSRunningApplication(processIdentifier: pid)?.forceTerminate()
+        refreshSoon()
+    }
+
+    func setHidden(_ app: TaskApp, _ hidden: Bool) {
+        guard let pid = app.pid, let running = NSRunningApplication(processIdentifier: pid) else { return }
+        _ = hidden ? running.hide() : running.unhide()
+        refreshSoon()
+    }
+
+    /// Hides every other app, like Option-clicking Hide in the Dock.
+    func hideOthers(_ app: TaskApp) {
+        let own = ProcessInfo.processInfo.processIdentifier
+        for other in NSWorkspace.shared.runningApplications
+        where other.activationPolicy == .regular && other.processIdentifier != app.pid && other.processIdentifier != own {
+            other.hide()
+        }
+        if let pid = app.pid { NSRunningApplication(processIdentifier: pid)?.activate() }
+        refreshSoon()
+    }
+
+    /// Quits Finder and starts it again, like the Dock's Option-click Relaunch.
+    func relaunchFinder() {
+        let finders = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder")
+        finders.forEach { $0.forceTerminate() }
+        // macOS usually restarts Finder by itself; open it in case it doesn't.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            if NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.finder").isEmpty {
+                NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: Self.finderPath),
+                                                   configuration: NSWorkspace.OpenConfiguration())
+            }
+            self?.refreshSoon()
+        }
+    }
+
     // MARK: Show desktop
 
     private var hiddenForDesktop: [pid_t] = []

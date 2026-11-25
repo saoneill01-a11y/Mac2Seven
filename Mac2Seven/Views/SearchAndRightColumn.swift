@@ -202,13 +202,13 @@ struct PlaceRow: View {
             .onHover { inside in
                 guard !DemoMode.isOn else { return }
                 hover = inside
-                state.hoverIconPath = inside ? place.path : nil
+                state.hoverIconPath = inside ? place.iconPath : nil
             }
             .onTapGesture {
-                NSWorkspace.shared.open(place.url)
                 state.close()
+                if place.isSnip { state.snipHandler() } else { NSWorkspace.shared.open(place.url) }
             }
-            .help(place.path)
+            .help(place.isSnip ? "Take a screenshot" : place.path)
     }
 }
 

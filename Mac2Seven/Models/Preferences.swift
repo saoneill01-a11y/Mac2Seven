@@ -111,6 +111,13 @@ struct Place: Codable, Identifiable, Equatable {
     var url: URL { URL(fileURLWithPath: path) }
 
     static func separator() -> Place { Place(title: "", path: "", isSeparator: true) }
+
+    /// Mac2Seven's own Snip tool, so it can be opened from the Start menu with the taskbar turned off.
+    static let snipPath = "mac2seven:snip"
+    static func snip() -> Place { Place(title: "Snipping Tool", path: snipPath) }
+    var isSnip: Bool { path == Self.snipPath }
+    /// The icon path to show for this place (Snip uses Mac2Seven's own icon).
+    var iconPath: String { isSnip ? Bundle.main.bundlePath : path }
 }
 
 enum TaskbarAlignment: String, Codable, CaseIterable, Identifiable {
@@ -193,6 +200,8 @@ struct PrefsData: Codable, Equatable {
     var useSystemAccent = true
     var accentHex = "#2F7FE0"
     var places: [Place] = PrefsData.defaultPlaces()
+    /// Snipping Tool has been added to the places once (so removing it sticks).
+    var snipPlaceAdded = true
     var hotkey: HotkeySpec = .default
     var powerAction: PowerAction = .shutDown
     var frequentCount = 10
@@ -218,6 +227,15 @@ struct PrefsData: Codable, Equatable {
         useSystemAccent = (try? c.decodeIfPresent(Bool.self, forKey: .useSystemAccent)) ?? d.useSystemAccent
         accentHex = (try? c.decodeIfPresent(String.self, forKey: .accentHex)) ?? d.accentHex
         places = (try? c.decodeIfPresent([Place].self, forKey: .places)) ?? d.places
+        snipPlaceAdded = (try? c.decodeIfPresent(Bool.self, forKey: .snipPlaceAdded)) ?? false
+        if !snipPlaceAdded {
+            // Settings from before 1.3.8: add Snipping Tool after Activity Monitor, or at the end.
+            if !places.contains(where: \.isSnip) {
+                let after = places.lastIndex { $0.path.hasSuffix("/Activity Monitor.app") }
+                places.insert(.snip(), at: after.map { $0 + 1 } ?? places.endIndex)
+            }
+            snipPlaceAdded = true
+        }
         hotkey = (try? c.decodeIfPresent(HotkeySpec.self, forKey: .hotkey)) ?? d.hotkey
         powerAction = (try? c.decodeIfPresent(PowerAction.self, forKey: .powerAction)) ?? d.powerAction
         frequentCount = (try? c.decodeIfPresent(Int.self, forKey: .frequentCount)) ?? d.frequentCount
@@ -247,6 +265,7 @@ struct PrefsData: Codable, Equatable {
             .separator(),
             Place(title: "System Settings", path: "/System/Applications/System Settings.app"),
             Place(title: "Activity Monitor", path: "/System/Applications/Utilities/Activity Monitor.app"),
+            .snip(),
         ]
     }
 }

@@ -371,6 +371,8 @@ final class TaskbarController {
     /// active, which the taskbar's app never is, so the pointer position is checked directly instead.
     private func trackPointer() {
         let point = NSEvent.mouseLocation
+        let option = NSEvent.modifierFlags.contains(.option)
+        for model in barHovers where model.optionDown != option { model.optionDown = option }
         if isDraggingButton && NSEvent.pressedMouseButtons & 1 == 0 { cancelDrag() }
 
         if let panel = previewPanel, panel.isVisible, panel.frame.contains(point) {

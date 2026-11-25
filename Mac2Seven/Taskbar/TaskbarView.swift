@@ -19,6 +19,9 @@ final class HoverModel: ObservableObject {
     /// Set when one window's button (window titles mode) is being dragged, rather than the whole app.
     @Published var draggingWindow: CGWindowID?
     @Published var dropLine: CGRect?
+    /// Option is held: right-click menus show the Dock's Option items (Relaunch Finder, Force Quit, Hide Others).
+    /// Kept up to date by the controller, so the menu is already built that way when it opens.
+    @Published var optionDown = false
 }
 
 /// Callbacks from the taskbar view to its controller.
@@ -451,6 +454,12 @@ struct TaskButtonView: View {
         Button(app.isRunning ? "New \(app.name) Window" : "Open \(app.name)") {
             tracker.launch(app.path)
         }
+        if app.path == WindowTracker.finderPath {
+            // The same extra items as Finder's Dock menu.
+            ForEach(WindowTracker.finderMenuItems, id: \.self) { title in
+                Button(title) { tracker.pressFinderMenuItem(title) }
+            }
+        }
         Divider()
         if app.pinned {
             Button("Unpin from Taskbar") { prefs.data.taskbar.pinned.removeAll { $0 == app.path } }
@@ -473,7 +482,19 @@ struct TaskButtonView: View {
             Button(app.windows.count > 1 ? "Close All Windows" : "Close Window") { tracker.closeAll(app) }
         }
         if app.isRunning {
-            Button("Quit \(app.name)") { tracker.quit(app) }
+            Divider()
+            if hover.optionDown {
+                Button("Hide Others") { tracker.hideOthers(app) }
+            } else {
+                Button(app.isHidden ? "Show" : "Hide") { tracker.setHidden(app, !app.isHidden) }
+            }
+            if app.path == WindowTracker.finderPath {
+                if hover.optionDown { Button("Relaunch") { tracker.relaunchFinder() } }
+            } else if hover.optionDown {
+                Button("Force Quit \(app.name)") { tracker.forceQuit(app) }
+            } else {
+                Button("Quit \(app.name)") { tracker.quit(app) }
+            }
         }
         Divider()
         Button("Show in Finder") {
